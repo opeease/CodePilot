@@ -620,13 +620,14 @@ export function MessageInput({
     const before = inputValue.slice(0, cursorPos);
     const after = inputValue.slice(cursorPos);
     const newValue = before + '/' + after;
+    const newCursorPos = cursorPos + 1;
     setInputValue(newValue);
+    // Set cursor position first so handleInputChange reads correct selectionStart
+    textarea.value = newValue;
+    textarea.selectionStart = newCursorPos;
+    textarea.selectionEnd = newCursorPos;
+    textarea.focus();
     handleInputChange(newValue);
-    setTimeout(() => {
-      textarea.focus();
-      textarea.selectionStart = cursorPos + 1;
-      textarea.selectionEnd = cursorPos + 1;
-    }, 0);
   }, [inputValue, handleInputChange]);
 
   const handleSubmit = useCallback(async (msg: { text: string; files: Array<{ type: string; url: string; filename?: string; mediaType?: string }> }, e: FormEvent<HTMLFormElement>) => {
@@ -935,7 +936,7 @@ export function MessageInput({
   const chatStatus: ChatStatus = isStreaming ? 'streaming' : 'ready';
 
   return (
-    <div className="bg-background/80 backdrop-blur-lg px-4 py-3">
+    <div className="bg-background/80 backdrop-blur-lg px-4 pt-2 pb-1">
       <div className="mx-auto">
         <div className="relative">
           {/* Popover */}
@@ -1136,6 +1137,9 @@ export function MessageInput({
                 {/* Attach file button */}
                 <AttachFileButton />
 
+                {/* Slash command button */}
+                <SlashCommandButton onInsertSlash={handleInsertSlash} />
+
                 {/* Model selector */}
                 <div className="relative" ref={modelMenuRef}>
                   <PromptInputButton
@@ -1187,8 +1191,6 @@ export function MessageInput({
                   )}
                 </div>
 
-                {/* Slash command button */}
-                <SlashCommandButton onInsertSlash={handleInsertSlash} />
               </PromptInputTools>
 
               <FileAwareSubmitButton

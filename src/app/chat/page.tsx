@@ -6,6 +6,7 @@ import type { Message, SSEEvent, SessionResponse, TokenUsage, PermissionRequestE
 import { MessageList } from '@/components/chat/MessageList';
 import { MessageInput } from '@/components/chat/MessageInput';
 import { ChatComposerActionBar } from '@/components/chat/ChatComposerActionBar';
+import { ChatPermissionSelector } from '@/components/chat/ChatPermissionSelector';
 import { ImageGenToggle } from '@/components/chat/ImageGenToggle';
 import { PermissionPrompt } from '@/components/chat/PermissionPrompt';
 import { usePanel } from '@/hooks/usePanel';
@@ -37,6 +38,7 @@ export default function NewChatPage() {
   const [pendingPermission, setPendingPermission] = useState<PermissionRequestEvent | null>(null);
   const [permissionResolved, setPermissionResolved] = useState<'allow' | 'deny' | null>(null);
   const [streamingToolOutput, setStreamingToolOutput] = useState('');
+  const [permissionProfile, setPermissionProfile] = useState<'default' | 'full_access'>('default');
   const abortControllerRef = useRef<AbortController | null>(null);
 
   const stopStreaming = useCallback(() => {
@@ -114,6 +116,7 @@ export default function NewChatPage() {
           title: content.slice(0, 50),
           mode,
           working_directory: workingDir.trim(),
+          permission_profile: permissionProfile,
         };
 
         const createRes = await fetch('/api/chat/sessions', {
@@ -315,7 +318,7 @@ export default function NewChatPage() {
         abortControllerRef.current = null;
       }
     },
-    [isStreaming, router, workingDir, mode, currentModel, currentProviderId, setPendingApprovalSessionId]
+    [isStreaming, router, workingDir, mode, currentModel, currentProviderId, permissionProfile, setPendingApprovalSessionId]
   );
 
   const handleCommand = useCallback((command: string) => {
@@ -388,6 +391,12 @@ export default function NewChatPage() {
       />
       <ChatComposerActionBar
         left={<ImageGenToggle />}
+        center={
+          <ChatPermissionSelector
+            permissionProfile={permissionProfile}
+            onPermissionChange={setPermissionProfile}
+          />
+        }
       />
     </div>
   );

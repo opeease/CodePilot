@@ -23,18 +23,18 @@ export function ContextUsageIndicator({ messages, modelName }: ContextUsageIndic
   const { t } = useTranslation();
   const usage = useContextUsage(messages, modelName);
 
-  const size = 22;
-  const strokeWidth = 3;
+  const size = 16;
+  const strokeWidth = 2.5;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - usage.ratio * circumference;
 
-  // Color based on usage ratio
+  // Color based on usage ratio — used portion is dark gray by default
   let strokeColor = 'text-muted-foreground';
   if (usage.hasData) {
     if (usage.ratio > 0.8) strokeColor = 'text-red-500';
     else if (usage.ratio > 0.6) strokeColor = 'text-yellow-500';
-    else strokeColor = 'text-primary';
+    else strokeColor = 'text-zinc-600 dark:text-zinc-400';
   }
 
   return (

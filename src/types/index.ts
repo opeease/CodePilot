@@ -176,6 +176,7 @@ export interface CreateSessionRequest {
   working_directory?: string;
   mode?: string;
   provider_id?: string;
+  permission_profile?: string;
 }
 
 export interface SendMessageRequest {

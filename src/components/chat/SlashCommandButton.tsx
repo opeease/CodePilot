@@ -1,7 +1,5 @@
 'use client';
 
-import { HugeiconsIcon } from "@hugeicons/react";
-import { CommandLineIcon } from "@hugeicons/core-free-icons";
 import { useTranslation } from '@/hooks/useTranslation';
 import type { TranslationKey } from '@/i18n';
 import {
@@ -22,7 +20,7 @@ export function SlashCommandButton({ onInsertSlash }: SlashCommandButtonProps) {
     <Tooltip>
       <TooltipTrigger asChild>
         <PromptInputButton onClick={onInsertSlash}>
-          <HugeiconsIcon icon={CommandLineIcon} className="h-3.5 w-3.5" />
+          <span className="text-sm font-medium leading-none">/</span>
         </PromptInputButton>
       </TooltipTrigger>
       <TooltipContent>
