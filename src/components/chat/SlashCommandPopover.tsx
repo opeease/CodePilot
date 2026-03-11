@@ -1,34 +1,21 @@
 'use client';
 
 import { useCallback } from 'react';
-import {
-  At,
-  Terminal,
-  NotePencil,
-  Brain,
-  GlobeSimple,
-  Lightning,
-} from '@phosphor-icons/react';
-import type { Icon } from '@phosphor-icons/react';
-import { cn } from '@/lib/utils';
+import { At, Terminal, NotePencil, Brain, GlobeSimple, Lightning } from '@/components/ui/icon';
 import { useTranslation } from '@/hooks/useTranslation';
 import type { TranslationKey } from '@/i18n';
-import type { SkillKind } from '@/types';
+import type { PopoverItem, PopoverMode } from '@/types';
+import {
+  CommandList,
+  CommandListSearch,
+  CommandListItems,
+  CommandListItem,
+  CommandListGroup,
+  CommandListFooter,
+  CommandListFooterAction,
+} from '@/components/patterns';
 
-export interface PopoverItem {
-  label: string;
-  value: string;
-  description?: string;
-  descriptionKey?: TranslationKey;
-  builtIn?: boolean;
-  immediate?: boolean;
-  installedSource?: 'agents' | 'claude';
-  source?: 'global' | 'project' | 'plugin' | 'installed' | 'sdk';
-  kind?: SkillKind;
-  icon?: Icon;
-}
-
-export type PopoverMode = 'file' | 'skill' | 'cli' | null;
+export type { PopoverItem, PopoverMode } from '@/types';
 
 interface SlashCommandPopoverProps {
   popoverMode: PopoverMode;
@@ -95,8 +82,7 @@ export function SlashCommandPopover({
     }
   }, [selectedIndex, allDisplayedItems, onSetSelectedIndex, onInsertItem, onClosePopover, onFocusTextarea]);
 
-  const handleFilterChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
+  const handleFilterChange = useCallback((val: string) => {
     onSetPopoverFilter(val);
     onSetSelectedIndex(0);
     // Sync textarea: replace the filter portion after /
@@ -107,13 +93,10 @@ export function SlashCommandPopover({
   }, [triggerPos, inputValue, onSetPopoverFilter, onSetSelectedIndex, onSetInputValue]);
 
   const renderItem = (item: PopoverItem, idx: number) => (
-    <button
+    <CommandListItem
       key={`${idx}-${item.value}`}
-      ref={idx === selectedIndex ? (el) => { el?.scrollIntoView({ block: 'nearest' }); } : undefined}
-      className={cn(
-        "flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors",
-        idx === selectedIndex ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"
-      )}
+      active={idx === selectedIndex}
+      itemRef={idx === selectedIndex ? (el) => { el?.scrollIntoView({ block: 'nearest' }); } : undefined}
       onClick={() => onInsertItem(item)}
       onMouseEnter={() => onSetSelectedIndex(idx)}
     >
@@ -141,103 +124,85 @@ export function SlashCommandPopover({
           {item.installedSource === 'claude' ? 'Personal' : 'Agents'}
         </span>
       )}
-    </button>
+    </CommandListItem>
   );
 
   if (!popoverMode || popoverMode === 'cli') return null;
   if (allDisplayedItems.length === 0 && !aiSearchLoading) return null;
 
   return (
-    <div
-      ref={popoverRef}
-      className="absolute bottom-full left-0 mb-2 w-full max-w-2xl rounded-xl border bg-popover shadow-lg overflow-hidden z-50"
-    >
-      {popoverMode === 'skill' ? (
-        <div className="px-3 py-2 border-b">
-          <input
-            ref={searchInputRef}
-            type="text"
-            placeholder="Search..."
+    <div ref={popoverRef}>
+      <CommandList className="w-full max-w-2xl">
+        {popoverMode === 'skill' ? (
+          <CommandListSearch
+            inputRef={searchInputRef}
             value={popoverFilter}
             onChange={handleFilterChange}
             onKeyDown={handleSearchKeyDown}
-            className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
           />
-        </div>
-      ) : (
-        <div className="px-3 py-2 text-xs font-medium text-muted-foreground border-b">
-          Files
-        </div>
-      )}
-      <div className="max-h-48 overflow-y-auto py-1">
-        {popoverMode === 'file' ? (
-          filteredItems.map((item, i) => renderItem(item, i))
         ) : (
-          <>
-            {builtInItems.length > 0 && (
-              <>
-                <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground">
-                  Commands
-                </div>
-                {builtInItems.map((item) => {
-                  const idx = globalIdx++;
-                  return renderItem(item, idx);
-                })}
-              </>
-            )}
-            {slashCommandItems.length > 0 && (
-              <>
-                <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground">
-                  Slash Commands
-                </div>
-                {slashCommandItems.map((item) => {
-                  const idx = globalIdx++;
-                  return renderItem(item, idx);
-                })}
-              </>
-            )}
-            {agentSkillItems.length > 0 && (
-              <>
-                <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground">
-                  Agent Skills
-                </div>
-                {agentSkillItems.map((item) => {
-                  const idx = globalIdx++;
-                  return renderItem(item, idx);
-                })}
-              </>
-            )}
-            {/* AI Suggested section */}
-            {(aiSuggestions.length > 0 || aiSearchLoading) && (
-              <>
-                <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-                  <Brain size={14} />
-                  {t('messageInput.aiSuggested')}
-                  {aiSearchLoading && (
-                    <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                  )}
-                </div>
-                {aiSuggestions.map((item) => {
-                  const idx = globalIdx++;
-                  return renderItem(item, idx);
-                })}
-              </>
-            )}
-          </>
+          <div className="px-3 py-2 text-xs font-medium text-muted-foreground border-b">
+            Files
+          </div>
         )}
-      </div>
-      {/* Footer: manage skills (skill mode only) */}
-      {popoverMode === 'skill' && (
-        <div className="border-t px-3 py-1.5">
-          <button
-            className="flex w-full items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors py-1"
-            onClick={() => { onClosePopover(); window.location.href = '/skills'; }}
-          >
-            <Lightning size={14} />
-            {t('composer.manageSkills' as TranslationKey)}
-          </button>
-        </div>
-      )}
+        <CommandListItems className="max-h-48">
+          {popoverMode === 'file' ? (
+            filteredItems.map((item, i) => renderItem(item, i))
+          ) : (
+            <>
+              {builtInItems.length > 0 && (
+                <CommandListGroup label="Commands">
+                  {builtInItems.map((item) => {
+                    const idx = globalIdx++;
+                    return renderItem(item, idx);
+                  })}
+                </CommandListGroup>
+              )}
+              {slashCommandItems.length > 0 && (
+                <CommandListGroup label="Slash Commands">
+                  {slashCommandItems.map((item) => {
+                    const idx = globalIdx++;
+                    return renderItem(item, idx);
+                  })}
+                </CommandListGroup>
+              )}
+              {agentSkillItems.length > 0 && (
+                <CommandListGroup label="Agent Skills">
+                  {agentSkillItems.map((item) => {
+                    const idx = globalIdx++;
+                    return renderItem(item, idx);
+                  })}
+                </CommandListGroup>
+              )}
+              {/* AI Suggested section */}
+              {(aiSuggestions.length > 0 || aiSearchLoading) && (
+                <CommandListGroup>
+                  <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                    <Brain size={14} />
+                    {t('messageInput.aiSuggested')}
+                    {aiSearchLoading && (
+                      <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                    )}
+                  </div>
+                  {aiSuggestions.map((item) => {
+                    const idx = globalIdx++;
+                    return renderItem(item, idx);
+                  })}
+                </CommandListGroup>
+              )}
+            </>
+          )}
+        </CommandListItems>
+        {/* Footer: manage skills (skill mode only) */}
+        {popoverMode === 'skill' && (
+          <CommandListFooter>
+            <CommandListFooterAction onClick={() => { onClosePopover(); window.location.href = '/skills'; }}>
+              <Lightning size={14} />
+              {t('composer.manageSkills' as TranslationKey)}
+            </CommandListFooterAction>
+          </CommandListFooter>
+        )}
+      </CommandList>
     </div>
   );
 }

@@ -9,7 +9,7 @@ import {
   resolveShikiThemes,
 } from "@/lib/theme/code-themes";
 import { useTranslation } from "@/hooks/useTranslation";
-import { Sun, Moon, Desktop } from "@phosphor-icons/react";
+import { Sun, Moon, Desktop } from "@/components/ui/icon";
 import {
   Select,
   SelectContent,

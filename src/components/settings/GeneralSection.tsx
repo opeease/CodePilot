@@ -13,7 +13,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ArrowClockwise, SpinnerGap } from "@phosphor-icons/react";
+import { ArrowClockwise, SpinnerGap } from "@/components/ui/icon";
 import { useUpdate } from "@/hooks/useUpdate";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useAccountInfo } from "@/hooks/useAccountInfo";
@@ -79,7 +79,7 @@ function UpdateCard() {
           {updateInfo.updateAvailable ? (
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <span className={`h-2 w-2 rounded-full ${updateInfo.readyToInstall ? 'bg-green-500' : isDownloading ? 'bg-yellow-500 animate-pulse' : 'bg-primary'}`} />
+                <span className={`h-2 w-2 rounded-full ${updateInfo.readyToInstall ? 'bg-status-success' : isDownloading ? 'bg-status-warning animate-pulse' : 'bg-primary'}`} />
                 <span className="text-sm">
                   {updateInfo.readyToInstall
                     ? t('update.readyToInstall', { version: updateInfo.latestVersion })
@@ -108,7 +108,7 @@ function UpdateCard() {
                 </div>
               )}
               {updateInfo.lastError && (
-                <p className="text-xs text-red-600 dark:text-red-400">
+                <p className="text-xs text-status-error-foreground">
                   {updateInfo.lastError}
                 </p>
               )}
@@ -199,7 +199,7 @@ export function GeneralSection() {
       <UpdateCard />
 
       {/* General settings card */}
-      <SettingsCard className={skipPermissions ? "border-orange-500/50 bg-orange-500/5" : undefined}>
+      <SettingsCard className={skipPermissions ? "border-status-warning-border bg-status-warning-muted" : undefined}>
         {/* Auto-approve toggle */}
         <FieldRow
           label={t('settings.autoApproveTitle')}
@@ -213,7 +213,7 @@ export function GeneralSection() {
         </FieldRow>
         {skipPermissions && (
           <StatusBanner variant="warning">
-            <span className="h-2 w-2 shrink-0 rounded-full bg-orange-500 inline-block mr-1" />
+            <span className="h-2 w-2 shrink-0 rounded-full bg-status-warning inline-block mr-1" />
             {t('settings.autoApproveWarning')}
           </StatusBanner>
         )}
@@ -296,7 +296,7 @@ export function GeneralSection() {
                   <li>{t('settings.autoApproveFileOps')}</li>
                   <li>{t('settings.autoApproveNetwork')}</li>
                 </ul>
-                <p className="font-medium text-orange-600 dark:text-orange-400">
+                <p className="font-medium text-status-warning-foreground">
                   {t('settings.autoApproveTrustWarning')}
                 </p>
               </div>
@@ -306,7 +306,7 @@ export function GeneralSection() {
             <AlertDialogCancel>{t('settings.cancel')}</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => saveSkipPermissions(true)}
-              className="bg-orange-600 hover:bg-orange-700 text-white"
+              className="bg-status-warning hover:bg-status-warning/80 text-white"
             >
               {t('settings.enableAutoApprove')}
             </AlertDialogAction>

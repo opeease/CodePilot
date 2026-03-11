@@ -1,17 +1,21 @@
 'use client';
 
 import { useCallback } from 'react';
-import { Terminal } from '@phosphor-icons/react';
-import { cn } from '@/lib/utils';
+import { Terminal } from '@/components/ui/icon';
 import { useTranslation } from '@/hooks/useTranslation';
 import type { TranslationKey } from '@/i18n';
+import type { CliToolItem } from '@/types';
+import {
+  CommandList,
+  CommandListSearch,
+  CommandListItems,
+  CommandListItem,
+  CommandListEmpty,
+  CommandListFooter,
+  CommandListFooterAction,
+} from '@/components/patterns';
 
-export interface CliToolItem {
-  id: string;
-  name: string;
-  version: string | null;
-  summary: string;
-}
+export type { CliToolItem } from '@/types';
 
 interface CliToolsPopoverProps {
   popoverRef: React.RefObject<HTMLDivElement | null>;
@@ -63,66 +67,54 @@ export function CliToolsPopover({
   }, [selectedIndex, filtered, onSetSelectedIndex, onCliSelect, onClosePopover, onFocusTextarea]);
 
   return (
-    <div
-      ref={popoverRef}
-      className="absolute bottom-full left-0 mb-2 w-full max-w-2xl rounded-xl border bg-popover shadow-lg overflow-hidden z-50"
-    >
-      <div className="px-3 py-2 border-b">
-        <input
-          ref={cliSearchRef}
-          type="text"
+    <div ref={popoverRef}>
+      <CommandList className="w-full max-w-2xl">
+        <CommandListSearch
+          inputRef={cliSearchRef}
           placeholder={t('cliTools.searchPlaceholder' as TranslationKey)}
           value={cliFilter}
-          onChange={(e) => { onSetCliFilter(e.target.value); onSetSelectedIndex(0); }}
+          onChange={(val) => { onSetCliFilter(val); onSetSelectedIndex(0); }}
           onKeyDown={handleSearchKeyDown}
-          className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
         />
-      </div>
-      <div className="max-h-48 overflow-y-auto py-1">
-        {filtered.length > 0 ? (
-          filtered.map((tool, idx) => (
-            <button
-              key={tool.id}
-              ref={idx === selectedIndex ? (el) => { el?.scrollIntoView({ block: 'nearest' }); } : undefined}
-              className={cn(
-                "flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm transition-colors",
-                idx === selectedIndex ? "bg-accent text-accent-foreground" : "hover:bg-accent/50"
-              )}
-              onClick={() => onCliSelect(tool)}
-              onMouseEnter={() => onSetSelectedIndex(idx)}
-            >
-              <Terminal size={16} className="shrink-0 text-muted-foreground" />
-              <span className="font-medium text-xs truncate">{tool.name}</span>
-              {tool.version && (
-                <span className="text-[10px] text-muted-foreground shrink-0">v{tool.version}</span>
-              )}
-              {tool.summary && (
-                <span className="text-xs text-muted-foreground truncate ml-auto max-w-[200px]">{tool.summary}</span>
-              )}
-            </button>
-          ))
-        ) : (
-          <div className="px-3 py-4 text-center">
-            <p className="text-sm text-muted-foreground">{t('cliTools.noToolsDetected' as TranslationKey)}</p>
-            <button
-              className="mt-2 text-xs text-primary hover:underline"
-              onClick={() => { onClosePopover(); window.location.href = '/cli-tools'; }}
-            >
-              {t('cliTools.goInstall' as TranslationKey)}
-            </button>
-          </div>
-        )}
-      </div>
-      {/* Footer: manage CLI tools */}
-      <div className="border-t px-3 py-1.5">
-        <button
-          className="flex w-full items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors py-1"
-          onClick={() => { onClosePopover(); window.location.href = '/cli-tools'; }}
-        >
-          <Terminal size={14} />
-          {t('cliTools.manageCli' as TranslationKey)}
-        </button>
-      </div>
+        <CommandListItems className="max-h-48">
+          {filtered.length > 0 ? (
+            filtered.map((tool, idx) => (
+              <CommandListItem
+                key={tool.id}
+                active={idx === selectedIndex}
+                itemRef={idx === selectedIndex ? (el) => { el?.scrollIntoView({ block: 'nearest' }); } : undefined}
+                onClick={() => onCliSelect(tool)}
+                onMouseEnter={() => onSetSelectedIndex(idx)}
+              >
+                <Terminal size={16} className="shrink-0 text-muted-foreground" />
+                <span className="font-medium text-xs truncate">{tool.name}</span>
+                {tool.version && (
+                  <span className="text-[10px] text-muted-foreground shrink-0">v{tool.version}</span>
+                )}
+                {tool.summary && (
+                  <span className="text-xs text-muted-foreground truncate ml-auto max-w-[200px]">{tool.summary}</span>
+                )}
+              </CommandListItem>
+            ))
+          ) : (
+            <CommandListEmpty>
+              <p className="text-sm text-muted-foreground">{t('cliTools.noToolsDetected' as TranslationKey)}</p>
+              <CommandListFooterAction onClick={() => { onClosePopover(); window.location.href = '/cli-tools'; }}>
+                <span className="mt-2 text-xs text-primary hover:underline">
+                  {t('cliTools.goInstall' as TranslationKey)}
+                </span>
+              </CommandListFooterAction>
+            </CommandListEmpty>
+          )}
+        </CommandListItems>
+        {/* Footer: manage CLI tools */}
+        <CommandListFooter>
+          <CommandListFooterAction onClick={() => { onClosePopover(); window.location.href = '/cli-tools'; }}>
+            <Terminal size={14} />
+            {t('cliTools.manageCli' as TranslationKey)}
+          </CommandListFooterAction>
+        </CommandListFooter>
+      </CommandList>
     </div>
   );
 }

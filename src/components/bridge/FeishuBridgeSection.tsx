@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { SpinnerGap, CheckCircle, Warning } from "@phosphor-icons/react";
+import { SpinnerGap, CheckCircle, Warning } from "@/components/ui/icon";
 import { useTranslation } from "@/hooks/useTranslation";
 import { SettingsCard } from "@/components/patterns/SettingsCard";
 import { FieldRow } from "@/components/patterns/FieldRow";

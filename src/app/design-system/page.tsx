@@ -28,7 +28,7 @@ import {
   Plus,
   MagnifyingGlass,
   Copy,
-} from "@phosphor-icons/react";
+} from "@/components/ui/icon";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (

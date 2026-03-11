@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
-import { WarningCircle } from "@phosphor-icons/react";
+import { WarningCircle } from "@/components/ui/icon";
+import { Button } from "@/components/ui/button";
 import { useTranslation } from "@/hooks/useTranslation";
 
 interface ErrorBoundaryProps {
@@ -41,12 +42,14 @@ function ErrorFallback({
         </p>
 
         {error && (
-          <button
+          <Button
+            variant="link"
+            size="sm"
             onClick={() => setShowDetails((s) => !s)}
-            className="text-xs text-muted-foreground underline hover:text-foreground"
+            className="text-xs text-muted-foreground hover:text-foreground"
           >
             {showDetails ? t("error.hideDetails") : t("error.showDetails")}
-          </button>
+          </Button>
         )}
         {showDetails && error && (
           <pre className="max-h-40 w-full overflow-auto rounded-md border border-border/50 bg-muted/30 p-3 text-left text-xs text-muted-foreground">
@@ -56,18 +59,15 @@ function ErrorFallback({
         )}
 
         <div className="flex gap-2">
-          <button
-            onClick={onReset}
-            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-          >
+          <Button onClick={onReset}>
             {t("error.tryAgain")}
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="outline"
             onClick={() => window.location.reload()}
-            className="rounded-md border border-border bg-background px-4 py-2 text-sm font-medium text-foreground hover:bg-muted"
           >
             {t("error.reloadApp")}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

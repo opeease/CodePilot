@@ -2,10 +2,10 @@ import { type ReactElement, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 const variantStyles = {
-  success: "bg-green-500/10 text-green-600 dark:text-green-400",
-  warning: "bg-orange-500/10 text-orange-600 dark:text-orange-400",
-  error: "bg-red-500/10 text-red-600 dark:text-red-400",
-  info: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
+  success: "bg-status-success-muted text-status-success-foreground",
+  warning: "bg-status-warning-muted text-status-warning-foreground",
+  error: "bg-status-error-muted text-status-error-foreground",
+  info: "bg-status-info-muted text-status-info-foreground",
 } as const;
 
 interface StatusBannerProps {

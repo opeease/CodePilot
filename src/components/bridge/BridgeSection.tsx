@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { SpinnerGap, CheckCircle, Warning, TelegramLogo, ChatTeardrop, GameController, ChatsCircle } from "@phosphor-icons/react";
+import { SpinnerGap, CheckCircle, Warning, TelegramLogo, ChatTeardrop, GameController, ChatsCircle } from "@/components/ui/icon";
 import { useTranslation } from "@/hooks/useTranslation";
 import { useBridgeStatus } from "@/hooks/useBridgeStatus";
 import { SettingsCard } from "@/components/patterns/SettingsCard";
@@ -215,7 +215,7 @@ export function BridgeSection() {
               <div
                 className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-xs ${
                   isRunning
-                    ? "bg-green-500/10 text-green-600 dark:text-green-400"
+                    ? "bg-status-success-muted text-status-success-foreground"
                     : "bg-muted text-muted-foreground"
                 }`}
               >
@@ -360,7 +360,7 @@ export function BridgeSection() {
                   <div
                     className={`rounded px-2 py-0.5 text-xs ${
                       adapter.running
-                        ? "bg-green-500/10 text-green-600 dark:text-green-400"
+                        ? "bg-status-success-muted text-status-success-foreground"
                         : "bg-muted text-muted-foreground"
                     }`}
                   >
@@ -375,7 +375,7 @@ export function BridgeSection() {
                   </p>
                 )}
                 {adapter.error && (
-                  <p className="text-xs text-red-500">
+                  <p className="text-xs text-status-error-foreground">
                     {t("bridge.adapterLastError")}: {adapter.error}
                   </p>
                 )}

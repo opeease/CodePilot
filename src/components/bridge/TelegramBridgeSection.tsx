@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { SpinnerGap, CheckCircle, Warning } from "@phosphor-icons/react";
+import { SpinnerGap, CheckCircle, Warning } from "@/components/ui/icon";
 import { useTranslation } from "@/hooks/useTranslation";
 import { SettingsCard } from "@/components/patterns/SettingsCard";
 import { StatusBanner } from "@/components/patterns/StatusBanner";
@@ -21,7 +21,7 @@ const DEFAULT_SETTINGS: TelegramBridgeSettings = {
 };
 
 export function TelegramBridgeSection() {
-  const [settings, setSettings] = useState<TelegramBridgeSettings>(DEFAULT_SETTINGS);
+  const [, setSettings] = useState<TelegramBridgeSettings>(DEFAULT_SETTINGS);
   const [botToken, setBotToken] = useState("");
   const [chatId, setChatId] = useState("");
   const [allowedUsers, setAllowedUsers] = useState("");

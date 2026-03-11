@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { SpinnerGap, CheckCircle, Warning } from "@phosphor-icons/react";
+import { SpinnerGap, CheckCircle, Warning } from "@/components/ui/icon";
 import { useTranslation } from "@/hooks/useTranslation";
 import { SettingsCard } from "@/components/patterns/SettingsCard";
 import { FieldRow } from "@/components/patterns/FieldRow";

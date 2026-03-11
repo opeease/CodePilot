@@ -17,6 +17,8 @@ const eslintConfig = defineConfig([
     // apps/site generated artifacts
     "apps/site/.next/**",
     "apps/site/.source/**",
+    // External reference materials / vendored packages (not part of the main codebase)
+    "资料/**",
   ]),
 
   // ── Governance rules for business components ──
@@ -74,6 +76,41 @@ const eslintConfig = defineConfig([
       ],
     },
   },
+
+  // ── Discourage direct Phosphor imports outside ui/ and ai-elements/ — use ui/icon.tsx ──
+  {
+    files: [
+      "src/components/settings/**/*.{ts,tsx}",
+      "src/components/bridge/**/*.{ts,tsx}",
+      "src/components/chat/**/*.{ts,tsx}",
+      "src/components/gallery/**/*.{ts,tsx}",
+      "src/components/plugins/**/*.{ts,tsx}",
+      "src/components/skills/**/*.{ts,tsx}",
+      "src/components/project/**/*.{ts,tsx}",
+      "src/components/layout/**/*.{ts,tsx}",
+      "src/components/cli-tools/**/*.{ts,tsx}",
+      "src/app/**/*.{ts,tsx}",
+      "src/hooks/**/*.{ts,tsx}",
+    ],
+    rules: {
+      "no-restricted-imports": [
+        "warn",
+        {
+          patterns: [
+            {
+              group: ["@phosphor-icons/react"],
+              message: "Import icons from @/components/ui/icon instead. See docs/ui-governance.md.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+
+  // ── Raw status colors ──
+  // ESLint cannot lint inside className strings. Use `npm run lint:colors` (grep-based)
+  // to check for raw green/red/yellow/orange/blue-{400-700} usage in business components.
+  // Add `// lint-allow-raw-color` on lines where raw colors are intentional (e.g. diff syntax).
 
   // ── Component file size limit ──
   {
