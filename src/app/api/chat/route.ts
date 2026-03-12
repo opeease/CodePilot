@@ -38,8 +38,8 @@ export async function POST(request: NextRequest) {
   let activeLockId: string | undefined;
 
   try {
-    const body: SendMessageRequest & { files?: FileAttachment[]; toolTimeout?: number; provider_id?: string; systemPromptAppend?: string; autoTrigger?: boolean; thinking?: unknown; effort?: string; enableFileCheckpointing?: boolean; displayOverride?: string } = await request.json();
-    const { session_id, content, model, mode, files, toolTimeout, provider_id, systemPromptAppend, autoTrigger, thinking, effort, enableFileCheckpointing, displayOverride } = body;
+    const body: SendMessageRequest & { files?: FileAttachment[]; toolTimeout?: number; provider_id?: string; systemPromptAppend?: string; autoTrigger?: boolean; thinking?: unknown; effort?: string; enableFileCheckpointing?: boolean; displayOverride?: string; context_1m?: boolean } = await request.json();
+    const { session_id, content, model, mode, files, toolTimeout, provider_id, systemPromptAppend, autoTrigger, thinking, effort, enableFileCheckpointing, displayOverride, context_1m } = body;
 
     console.log('[chat API] content length:', content.length, 'first 200 chars:', content.slice(0, 200));
     console.log('[chat API] systemPromptAppend:', systemPromptAppend ? `${systemPromptAppend.length} chars` : 'none');
@@ -357,6 +357,7 @@ Start by greeting the user and asking the first question.
       bypassPermissions: session.permission_profile === 'full_access',
       thinking: thinking as ClaudeStreamOptions['thinking'],
       effort: effort as ClaudeStreamOptions['effort'],
+      context1m: context_1m,
       enableFileCheckpointing: enableFileCheckpointing ?? (effectiveMode === 'code'),
       autoTrigger: !!autoTrigger,
       onRuntimeStatusChange: (status: string) => {
@@ -648,6 +649,7 @@ async function processCompletionServerSide(
       if (wsPath) {
         const state = loadState(wsPath);
         state.hookTriggeredSessionId = undefined;
+        state.hookTriggeredAt = undefined;
         saveState(wsPath, state);
       }
     } catch {
