@@ -44,6 +44,13 @@ function loadMcpServers(): Record<string, MCPServerConfig> | undefined {
       ...((settings.mcpServers || {}) as Record<string, MCPServerConfig>),
       ...((projectMcp.mcpServers || {}) as Record<string, MCPServerConfig>),
     };
+    // Apply persistent enabled overrides for project-level servers
+    const settingsOverrides = (settings.mcpServerOverrides || {}) as Record<string, { enabled?: boolean }>;
+    for (const [name, override] of Object.entries(settingsOverrides)) {
+      if (merged[name] && override.enabled !== undefined) {
+        merged[name] = { ...merged[name], enabled: override.enabled };
+      }
+    }
     // Resolve ${...} placeholders in env values against DB settings
     for (const server of Object.values(merged)) {
       if (server.env) {
@@ -54,6 +61,12 @@ function loadMcpServers(): Record<string, MCPServerConfig> | undefined {
             server.env[key] = resolved || '';
           }
         }
+      }
+    }
+    // Filter out persistently disabled servers
+    for (const [name, server] of Object.entries(merged)) {
+      if (server.enabled === false) {
+        delete merged[name];
       }
     }
     return Object.keys(merged).length > 0 ? merged : undefined;

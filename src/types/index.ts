@@ -540,6 +540,8 @@ export interface MCPServerConfig {
   type?: 'stdio' | 'sse' | 'http';
   url?: string;
   headers?: Record<string, string>;
+  /** Persistent enable/disable. undefined or true = enabled; false = disabled. */
+  enabled?: boolean;
 }
 
 export interface MCPConfig {

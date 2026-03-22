@@ -45,8 +45,8 @@ const en = {
   'messageInput.reviewDesc': 'Review code quality',
   'messageInput.terminalSetupDesc': 'Configure terminal settings',
   'messageInput.memoryDesc': 'Edit project memory file',
-  'messageInput.modeCode': 'Code',
-  'messageInput.modePlan': 'Plan',
+  // 'messageInput.modeCode': 'Code', // Reserved: mode UI removed in latency remediation
+  // 'messageInput.modePlan': 'Plan', // Reserved: mode UI removed in latency remediation
   'messageInput.aiSuggested': 'AI Suggested',
 
   // ── Streaming message ───────────────────────────────────────
@@ -965,6 +965,9 @@ const en = {
   'mcp.noRuntimeStatus': 'No runtime status available',
   'mcp.reconnect': 'Reconnect',
   'mcp.enable': 'Enable',
+  'mcp.enabled': 'Enabled',
+  'mcp.disabled': 'Disabled',
+  'mcp.managerDesc': 'Toggle controls CodePilot MCP injection. Servers in your Claude Code config may still be loaded by the SDK via its own settings sources.',
 
   // ── SDK Capabilities: Thinking ────────────────────────────
   'settings.thinkingMode': 'Thinking Mode',
