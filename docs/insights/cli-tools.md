@@ -75,6 +75,21 @@ Karpathy 在 MenuGen 文章里花了 1 小时调试 `.env.local` 没同步到 Ve
 - 统一管理 CLI 工具的 API key / token
 - 在对话中自动检测"认证过期"并引导重新认证
 
+### 安装按钮从直接执行到对话式
+
+最初安装按钮直接通过 SSE 在服务端执行安装命令。这有三个问题：
+1. **权限问题无法处理** — `npm install -g` 在 macOS 上经常遇到 EACCES，用户只看到红色错误
+2. **认证引导断层** — 安装完了用户不知道下一步要 `stripe login` 还是 `gws auth setup`
+3. **前置依赖遗漏** — 有些工具需要先装 mpv、配置 Skills 等，SSE 流程不知道
+
+改成跳转聊天后，AI 可以 sudo 重试、从 `--help` 判断认证步骤、处理平台差异。但过程中犯了一个错误：把 `guideSteps`（给人看的文档）直接塞进 AI 的执行指令里，导致 `elevenlabs init` 在错误目录写文件、`brew install mpv` 在 Windows 执行。
+
+最终方案：`postInstallCommands` 只放 AI 靠 `--help` 发现不了的命令（如 Skills 安装），认证引导只给一个 hint 让 AI 自己判断。文档和指令分开——`guideSteps` 给人看，`postInstallCommands` 给 AI 执行。
+
+### Skills 安装的颗粒度问题
+
+飞书 CLI 有 19 个 Skills，全装没问题。但 Google Workspace CLI 有 100+ 个 Skills，全装太暴力。改成让 AI 先查看列表，结合用户实际需求推荐装哪些，询问确认后再装。这个决策体现了一个原则：**AI 应该像顾问一样推荐，而不是像脚本一样全执行。**
+
 ## 已知局限
 
 1. **版本更新检测依赖包管理器** — `brew outdated` / `npm outdated` 只能检测通过对应包管理器安装的工具。手动编译安装的工具无法检测更新。
