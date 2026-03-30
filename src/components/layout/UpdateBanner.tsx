@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { Button } from "@/components/ui/button";
 import { useUpdate } from "@/hooks/useUpdate";
 import { useTranslation } from "@/hooks/useTranslation";
@@ -9,37 +9,55 @@ function getRosettaDismissKey(assetName: string, version: string): string {
   return `codepilot:rosetta-warning-dismissed:${assetName || version || 'unknown'}`;
 }
 
+/**
+ * Read a localStorage boolean flag reactively.
+ * Writing via the returned `dismiss()` triggers a re-render via useSyncExternalStore.
+ */
+function useLocalStorageFlag(key: string) {
+  const subscribe = useCallback(
+    (onStoreChange: () => void) => {
+      const handler = (e: StorageEvent) => {
+        if (e.key === key) onStoreChange();
+      };
+      window.addEventListener('storage', handler);
+      return () => window.removeEventListener('storage', handler);
+    },
+    [key],
+  );
+
+  const getSnapshot = useCallback(() => {
+    try {
+      return localStorage.getItem(key) === '1';
+    } catch {
+      return false;
+    }
+  }, [key]);
+
+  const value = useSyncExternalStore(subscribe, getSnapshot, () => false);
+
+  const setFlag = useCallback(() => {
+    try {
+      localStorage.setItem(key, '1');
+    } catch {
+      // ignore persistence failures
+    }
+    // Force re-render — storage event doesn't fire for same-window writes
+    window.dispatchEvent(new StorageEvent('storage', { key }));
+  }, [key]);
+
+  return [value, setFlag] as const;
+}
+
 export function UpdateBanner() {
   const { updateInfo, quitAndInstall } = useUpdate();
   const { t } = useTranslation();
-  const [dismissedRosetta, setDismissedRosetta] = useState(false);
 
   const rosettaDismissKey = useMemo(
     () => getRosettaDismissKey(updateInfo?.downloadAssetName || '', updateInfo?.latestVersion || ''),
     [updateInfo?.downloadAssetName, updateInfo?.latestVersion],
   );
 
-  useEffect(() => {
-    if (!updateInfo?.runningUnderRosetta) {
-      setDismissedRosetta(false);
-      return;
-    }
-
-    try {
-      setDismissedRosetta(localStorage.getItem(rosettaDismissKey) === '1');
-    } catch {
-      setDismissedRosetta(false);
-    }
-  }, [rosettaDismissKey, updateInfo?.runningUnderRosetta]);
-
-  const dismissRosettaWarning = () => {
-    try {
-      localStorage.setItem(rosettaDismissKey, '1');
-    } catch {
-      // ignore persistence failures
-    }
-    setDismissedRosetta(true);
-  };
+  const [dismissedRosetta, dismissRosettaWarning] = useLocalStorageFlag(rosettaDismissKey);
 
   const openRecommendedDownload = () => {
     if (!updateInfo) return;
