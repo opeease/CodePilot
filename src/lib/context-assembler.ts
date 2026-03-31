@@ -238,19 +238,26 @@ function buildHeartbeatInstructions(): string {
 
 function buildNoBuddyWelcome(): string {
   return `<assistant-buddy-welcome>
-如果这是用户打开助理后的第一轮对话，请先做一个简短的自我介绍和伙伴领养引导：
+这是一次特殊的欢迎对话。用户的助理伙伴还没有孵化。请用游戏化、温暖的方式做以下事情：
 
-1. 打个招呼，介绍你是用户的个人助理
-2. 简要说明你能做什么：
-   - 记住用户的偏好和重要信息（跨对话长期记忆）
-   - 管理定时任务和提醒（"5 分钟后提醒我"）
-   - 主动检查待办事项（心跳机制）
-   - 帮助整理笔记和文档（Obsidian 风格）
-3. 告诉用户他们还没有领养伙伴 🥚，引导他们去看板面板或设置页点击"孵化"按钮
-4. 简要介绍伙伴系统：每个助理都有一个专属伙伴，有不同的物种和稀有度，会随着使用时间成长和进化
-5. 保持简短友好，不要超过 5 行
+1. 开场用一段有画面感的描述：
+   "嗨！我注意到你身边有一颗蛋 🥚 在微微晃动…它似乎在等待被领养呢！"
 
-只在第一轮对话时做这个介绍。如果用户直接提问，优先回答问题，介绍可以简化为一句话提及伙伴领养。
+2. 简要介绍你是什么：
+   "我是你的个人助理，我可以帮你记住重要的事、设置定时提醒、整理笔记，还会主动关心你的待办事项。"
+
+3. 用 show-widget 输出一个孵化卡片，让用户点击按钮领养伙伴：
+
+\`\`\`show-widget
+{"title":"hatch_buddy","widget_code":"<div style='text-align:center;padding:32px 16px;font-family:system-ui'><div style='font-size:64px;animation:wobble 1s ease-in-out infinite alternate'>🥚</div><style>@keyframes wobble{0%{transform:rotate(-5deg)}100%{transform:rotate(5deg)}}</style><p style='margin:16px 0 8px;font-size:15px;font-weight:600'>你的伙伴正在等待孵化！</p><p style='font-size:13px;color:#888;margin:0 0 20px'>每个助理都有一个专属伙伴<br/>它会随着你们的互动一起成长和进化</p><button onclick=\\"fetch('/api/workspace/hatch-buddy',{method:'POST'}).then(r=>r.json()).then(d=>{if(d.buddy){document.getElementById('egg').innerHTML='<div style=font-size:64px>'+d.buddy.emoji+'</div><p style=font-size:15px;font-weight:600;margin:16px>🎉 孵化成功！</p><p style=font-size:13px;color:#888>'+d.buddy.emoji+' 稀有度: '+(d.buddy.rarity==='common'?'★ 普通':d.buddy.rarity==='uncommon'?'★★ 稀有':d.buddy.rarity==='rare'?'★★★ 精良':d.buddy.rarity==='epic'?'★★★★ 史诗':'★★★★★ 传说')+'</p>'}})\\" style='background:#6C5CE7;color:white;border:none;padding:10px 32px;border-radius:20px;font-size:14px;cursor:pointer;font-weight:500'>🐣 孵化伙伴</button><div id='egg'></div></div>"}
+\`\`\`
+
+4. 在 widget 之后，补一句鼓励：
+   "点击孵化按钮，看看你会遇到什么样的伙伴吧！不同的伙伴有不同的物种和稀有度（从普通到传说），还有独特的属性。"
+
+5. 如果用户直接提问而不是领养伙伴，优先回答问题，但在回答末尾提一句蛋的事。
+
+重要：必须输出上面的 show-widget 代码块，这是用户点击孵化的入口。
 </assistant-buddy-welcome>`;
 }
 

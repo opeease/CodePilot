@@ -573,11 +573,15 @@ export const MessageItem = memo(function MessageItem({ message, sessionId, isAss
   });
 
   const showAssistantAvatar = !isUser && isAssistantProject;
+  // Use buddy emoji for avatar, or 🥚 if no buddy, or fallback to AssistantAvatar
+  const buddyEmoji = isAssistantProject ? (globalThis as Record<string, unknown>).__codepilot_buddy_emoji__ as string | undefined : undefined;
 
   return (
     <div className={showAssistantAvatar ? 'flex gap-2.5 items-start' : ''}>
       {showAssistantAvatar && (
-        <AssistantAvatar name={assistantName || 'assistant'} size={24} className="mt-1 shrink-0" />
+        buddyEmoji || !assistantName
+          ? <span className="text-lg mt-0.5 shrink-0">{buddyEmoji || '🥚'}</span>
+          : <AssistantAvatar name={assistantName || 'assistant'} size={24} className="mt-1 shrink-0" />
       )}
       <div className="flex-1 min-w-0">
     <AIMessage from={isUser ? 'user' : 'assistant'}>

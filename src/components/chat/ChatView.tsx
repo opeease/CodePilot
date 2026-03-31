@@ -215,6 +215,8 @@ export function ChatView({ sessionId, initialMessages = [], initialHasMore = fal
               if (summaryRes.ok && !cancelled) {
                 const summary = await summaryRes.json();
                 setAssistantName(summary.name || '');
+                // Store buddy emoji globally for MessageItem avatar rendering
+                (globalThis as Record<string, unknown>).__codepilot_buddy_emoji__ = summary.buddy?.emoji || undefined;
               }
             } catch { /* ignore */ }
           }
