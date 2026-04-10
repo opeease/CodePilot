@@ -13,7 +13,7 @@ import type { AgentRuntime, RuntimeStreamOptions } from './types';
 import type { ClaudeStreamOptions } from '@/types';
 import { findClaudeBinary } from '../platform';
 import { getConversation } from '../conversation-registry';
-import { getSetting } from '../db';
+import { getSetting, getActiveProvider } from '../db';
 
 export const sdkRuntime: AgentRuntime = {
   id: 'claude-code-sdk',
@@ -74,15 +74,27 @@ export const sdkRuntime: AgentRuntime = {
   },
 
   isAvailable(): boolean {
-    // SDK requires both CLI binary AND Anthropic credentials.
-    // Without Anthropic creds, auto mode should fall through to native runtime
-    // instead of trapping users in an auth deadlock (#456).
+    // SDK requires both CLI binary AND Anthropic-compatible credentials.
+    // Without creds, auto mode falls through to native runtime (#456).
+    // Credentials can come from: env vars, legacy DB setting, OR a configured
+    // Anthropic provider in api_providers (injected via toClaudeCodeEnv).
     if (!findClaudeBinary()) return false;
-    return !!(
+
+    // Check env vars + legacy setting
+    if (
       process.env.ANTHROPIC_API_KEY ||
       process.env.ANTHROPIC_AUTH_TOKEN ||
       getSetting('anthropic_auth_token')
-    );
+    ) return true;
+
+    // Check DB providers — any active provider with an API key works
+    // (toClaudeCodeEnv injects its key as ANTHROPIC_API_KEY/AUTH_TOKEN)
+    try {
+      const provider = getActiveProvider();
+      if (provider?.api_key) return true;
+    } catch { /* DB not ready */ }
+
+    return false;
   },
 
   dispose(): void {
