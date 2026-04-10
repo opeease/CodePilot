@@ -6,7 +6,7 @@
  */
 
 import type { AgentRuntime } from './types';
-import { getSetting, getActiveProvider } from '../db';
+import { getSetting, getAllProviders } from '../db';
 
 const runtimes = new Map<string, AgentRuntime>();
 
@@ -44,12 +44,15 @@ export function getAvailableRuntimes(): AgentRuntime[] {
 function hasAnyCredentials(): boolean {
   if (process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN) return true;
   if (getSetting('anthropic_auth_token')) return true;
+  // Check ALL providers (not just active) — the request might use any of them
   try {
-    const provider = getActiveProvider();
-    if (provider?.api_key) return true;
-    // Bedrock/Vertex: env_only, no api_key
-    if (provider?.extra_env?.includes('CLAUDE_CODE_USE_BEDROCK')) return true;
-    if (provider?.extra_env?.includes('CLAUDE_CODE_USE_VERTEX')) return true;
+    const providers = getAllProviders();
+    for (const p of providers) {
+      if (p.api_key) return true;
+      // Bedrock/Vertex: env_only, no api_key
+      if (p.extra_env?.includes('CLAUDE_CODE_USE_BEDROCK')) return true;
+      if (p.extra_env?.includes('CLAUDE_CODE_USE_VERTEX')) return true;
+    }
   } catch { /* DB not ready */ }
   return false;
 }
