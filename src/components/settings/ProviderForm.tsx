@@ -92,6 +92,10 @@ export function ProviderForm({
   // backend preserves the DB value. Same pattern as PresetConnectDialog.
   // See docs/exec-plans/active/v0.48-post-release-issues.md §5.5.
   const [hasStoredKey, setHasStoredKey] = useState(false);
+  // Companion flag for explicit "clear the stored key" intent. Without it,
+  // hasStoredKey + empty input is unconditionally interpreted as "keep
+  // existing", leaving users with no way to actually delete a stored key.
+  const [clearStoredKey, setClearStoredKey] = useState(false);
   const [extraEnv, setExtraEnv] = useState("{}");
   const [notes, setNotes] = useState("");
   const [headersJson, setHeadersJson] = useState("{}");
@@ -107,6 +111,7 @@ export function ProviderForm({
     if (!open) return;
     setError(null);
     setSaving(false);
+    setClearStoredKey(false);
 
     if (mode === "edit" && provider) {
       setName(provider.name);
@@ -205,11 +210,19 @@ export function ProviderForm({
       // Always sync protocol with provider_type to prevent stale protocol after edits
       const derivedProtocol = PROVIDER_PRESETS[providerType]?.protocol || providerType;
 
-      // #449 fix: omit api_key when editing with an untouched stored-key
-      // placeholder. undefined → JSON.stringify drops the field → backend
-      // updateProvider() preserves DB value via `?? existing.api_key`.
-      const apiKeyForSave: string | undefined =
-        mode === "edit" && hasStoredKey && !apiKey ? undefined : apiKey;
+      // #449 fix: three distinct save intents for api_key in edit mode.
+      // See PresetConnectDialog handleSubmit for the full rationale.
+      //   new value   → apiKey as-is
+      //   clear       → "" (overwrites DB since `?? existing` only falls
+      //                 back on nullish)
+      //   keep        → undefined (PUT body omits field → DB preserved)
+      //   create/no stored → apiKey as-is
+      const apiKeyForSave: string | undefined = (() => {
+        if (apiKey) return apiKey;
+        if (mode === "edit" && hasStoredKey && clearStoredKey) return "";
+        if (mode === "edit" && hasStoredKey) return undefined;
+        return apiKey;
+      })();
       await onSave({
         name: name.trim(),
         provider_type: providerType,
@@ -235,6 +248,9 @@ export function ProviderForm({
   // which was based on detecting "***" in apiKey state — we no longer load
   // masked values into state at all.
   const showStoredKeyPlaceholder = mode === "edit" && hasStoredKey && !apiKey;
+  // Show the explicit "clear stored key" affordance under the same
+  // conditions.
+  const showClearStoredKeyAction = showStoredKeyPlaceholder;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -302,11 +318,52 @@ export function ProviderForm({
             <Input
               id="provider-api-key"
               type="password"
-              placeholder={showStoredKeyPlaceholder ? "Leave empty to keep current key" : "sk-ant-..."}
+              placeholder={
+                clearStoredKey
+                  ? "Stored key will be cleared on save"
+                  : showStoredKeyPlaceholder
+                  ? "Leave empty to keep current key"
+                  : "sk-ant-..."
+              }
               value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
+              onChange={(e) => {
+                setApiKey(e.target.value);
+                // Typing a new key overrides any pending "clear" intent
+                if (clearStoredKey) setClearStoredKey(false);
+              }}
               className="font-mono text-sm"
             />
+            {/* Explicit "clear stored key" action — see PresetConnectDialog
+                for the rationale. Without this users cannot actually
+                delete a stored key. */}
+            {showClearStoredKeyAction && (
+              <p className="text-[11px]">
+                {clearStoredKey ? (
+                  <>
+                    <span className="text-amber-500">
+                      The stored key will be cleared on save.{" "}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="link"
+                      className="h-auto p-0 text-[11px] text-amber-500 underline hover:no-underline"
+                      onClick={() => setClearStoredKey(false)}
+                    >
+                      Undo
+                    </Button>
+                  </>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="h-auto p-0 text-[11px] text-muted-foreground underline hover:no-underline"
+                    onClick={() => setClearStoredKey(true)}
+                  >
+                    Clear stored key
+                  </Button>
+                )}
+              </p>
+            )}
           </div>
 
           {/* Advanced options toggle */}

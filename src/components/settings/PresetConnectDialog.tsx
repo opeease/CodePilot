@@ -69,6 +69,12 @@ export function PresetConnectDialog({
   // key string into state and sent it back, which tried to auth with "***"
   // against upstream APIs. See docs/exec-plans/active/v0.48-post-release-issues.md §5.5.
   const [hasStoredKey, setHasStoredKey] = useState(false);
+  // Companion flag for an explicit "I want to clear the stored key" intent.
+  // Without this, users would have no way to delete a stored key — the
+  // hasStoredKey + empty input combination is unconditionally interpreted as
+  // "keep existing". When clearStoredKey=true, save sends api_key="" so the
+  // backend overwrites the stored value.
+  const [clearStoredKey, setClearStoredKey] = useState(false);
   const [baseUrl, setBaseUrl] = useState("");
   const [name, setName] = useState("");
   const [extraEnv, setExtraEnv] = useState("{}");
@@ -92,6 +98,21 @@ export function PresetConnectDialog({
   const [testResult, setTestResult] = useState<{ success: boolean; error?: { code: string; message: string; suggestion: string; recoveryActions?: Array<{ label: string; url?: string; action?: string }> } } | null>(null);
   const { t } = useTranslation();
   const isZh = t('nav.chats') === '对话';
+
+  // Unified auth-style transition. Both the dropdown selector and the
+  // "smart recommend" helper link MUST go through this helper so edit-mode
+  // stored-key state migrates consistently. Switching AWAY from the stored
+  // style clears hasStoredKey (the user must provide a key for the new
+  // scheme); switching BACK restores it. Any pending "clear" intent is
+  // cancelled because an auth-style change is an unrelated user action.
+  const applyAuthStyleChange = (newStyle: "api_key" | "auth_token") => {
+    setAuthStyle(newStyle);
+    if (isEdit && editProvider?.api_key) {
+      setApiKey("");
+      setClearStoredKey(false);
+      setHasStoredKey(newStyle === initialAuthStyle);
+    }
+  };
 
   const handleTestConnection = async () => {
     setTesting(true);
@@ -143,6 +164,7 @@ export function PresetConnectDialog({
     setSaving(false);
     setTesting(false);
     setTestResult(null);
+    setClearStoredKey(false);
 
     if (isEdit && editProvider) {
       // Edit mode — pre-fill from existing provider
@@ -345,11 +367,22 @@ export function PresetConnectDialog({
 
     setSaving(true);
     try {
-      // #449 fix: omit api_key when user hasn't touched the stored-key
-      // placeholder (edit mode, no new input). Undefined → PUT body skips
-      // the field → backend updateProvider() uses `?? existing.api_key`.
-      const apiKeyForSave: string | undefined =
-        isEdit && hasStoredKey && !apiKey ? undefined : apiKey;
+      // #449 fix: three distinct save intents for api_key in edit mode.
+      //
+      //   apiKey non-empty         → "new value" — always wins.
+      //   hasStoredKey, clearStoredKey=true → "clear it" — send "" so the
+      //       backend overwrites the stored value. updateProvider()'s
+      //       `?? existing.api_key` only falls back on nullish, so "" wins.
+      //   hasStoredKey, clearStoredKey=false → "keep existing" — omit the
+      //       field entirely. undefined → JSON.stringify drops the key →
+      //       PUT body has no api_key → updateProvider() preserves DB value.
+      //   create mode / no stored key → pass apiKey as-is (possibly "").
+      const apiKeyForSave: string | undefined = (() => {
+        if (apiKey) return apiKey;
+        if (isEdit && hasStoredKey && clearStoredKey) return "";
+        if (isEdit && hasStoredKey) return undefined;
+        return apiKey;
+      })();
       await onSave({
         name: name.trim() || preset.name,
         provider_type: preset.provider_type,
@@ -462,24 +495,7 @@ export function PresetConnectDialog({
                 {preset.key === "anthropic-thirdparty" && (
                   <Select
                     value={authStyle}
-                    onValueChange={(v) => {
-                      const newStyle = v as "api_key" | "auth_token";
-                      setAuthStyle(newStyle);
-                      if (isEdit && editProvider?.api_key) {
-                        if (newStyle !== initialAuthStyle) {
-                          // Switching away from stored style — user must
-                          // re-enter a key for the new style.
-                          setApiKey("");
-                          setHasStoredKey(false);
-                        } else {
-                          // Switching back to stored style — restore the
-                          // "keep existing" placeholder state instead of
-                          // leaking the masked key string.
-                          setApiKey("");
-                          setHasStoredKey(true);
-                        }
-                      }
-                    }}
+                    onValueChange={(v) => applyAuthStyleChange(v as "api_key" | "auth_token")}
                   >
                     <SelectTrigger className="w-[130px] shrink-0 text-xs">
                       <SelectValue />
@@ -493,9 +509,15 @@ export function PresetConnectDialog({
                 <Input
                   type="password"
                   value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
+                  onChange={(e) => {
+                    setApiKey(e.target.value);
+                    // Typing a new key overrides any pending "clear" intent
+                    if (clearStoredKey) setClearStoredKey(false);
+                  }}
                   placeholder={
-                    hasStoredKey
+                    clearStoredKey
+                      ? (isZh ? "保存后将清空已存密钥" : "Stored key will be cleared on save")
+                      : hasStoredKey
                       ? (isZh ? "已保存，留空则沿用原密钥" : "Saved — leave blank to keep existing")
                       : (authStyle === "auth_token" ? "token-..." : "sk-...")
                   }
@@ -507,6 +529,39 @@ export function PresetConnectDialog({
               {preset.key !== "anthropic-thirdparty" && (
                 <p className="text-[11px] text-muted-foreground">
                   Auth: <span className="font-mono">{authStyle === "auth_token" ? "Authorization: Bearer ..." : "X-Api-Key: ..."}</span>
+                </p>
+              )}
+              {/* Explicit "clear stored key" action — only visible in edit
+                  mode when a stored key exists and the user hasn't typed a
+                  replacement. Without this, hasStoredKey + empty input was
+                  always interpreted as "keep existing", leaving users with
+                  no way to actually delete a stored key. */}
+              {isEdit && hasStoredKey && !apiKey && (
+                <p className="text-[11px]">
+                  {clearStoredKey ? (
+                    <>
+                      <span className="text-amber-500">
+                        {isZh ? "保存后将清空已存密钥。" : "The stored key will be cleared on save. "}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="link"
+                        className="h-auto p-0 text-[11px] text-amber-500 underline hover:no-underline"
+                        onClick={() => setClearStoredKey(false)}
+                      >
+                        {isZh ? "撤销" : "Undo"}
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="link"
+                      className="h-auto p-0 text-[11px] text-muted-foreground underline hover:no-underline"
+                      onClick={() => setClearStoredKey(true)}
+                    >
+                      {isZh ? "清除已存密钥" : "Clear stored key"}
+                    </Button>
+                  )}
                 </p>
               )}
               {/* Smart recommend for thirdparty based on URL */}
@@ -521,7 +576,7 @@ export function PresetConnectDialog({
                     <Button
                       variant="link"
                       className="h-auto p-0 text-[11px] text-amber-500 underline hover:no-underline"
-                      onClick={() => setAuthStyle(inferred)}
+                      onClick={() => applyAuthStyleChange(inferred)}
                     >
                       {isZh ? '切换' : 'Switch'}
                     </Button>
