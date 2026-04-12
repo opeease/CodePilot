@@ -97,9 +97,13 @@ function AskUserQuestionUI({
     onSubmit('allow', { questions: toolInput.questions, answers });
   };
 
-  const hasAnswer = questions.some((_, i) => {
+  // Require ALL questions to be answered before enabling Submit.
+  // `some` would allow partial submissions where unanswered questions
+  // produce empty-string answers — the model would continue as if the
+  // interview completed when it actually didn't.
+  const hasAnswer = questions.length > 0 && questions.every((_, i) => {
     const qIdx = String(i);
-    return (selections[qIdx]?.size || 0) > 0 || (useOther[qIdx] && otherTexts[qIdx]?.trim());
+    return (selections[qIdx]?.size || 0) > 0 || (useOther[qIdx] && !!otherTexts[qIdx]?.trim());
   });
 
   return (
