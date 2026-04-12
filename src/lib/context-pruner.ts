@@ -2,7 +2,8 @@
  * context-pruner.ts — Microcompact: prune old tool results before each API call.
  *
  * Reduces token usage by replacing detailed tool_result content from older
- * turns with a short summary. Recent turns are preserved in full.
+ * turns with a short fixed marker (not an LLM summary). Recent turns are
+ * preserved in full.
  *
  * This runs before every streamText() call in the agent loop.
  */
