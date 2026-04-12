@@ -1,7 +1,7 @@
 # Hermes-Inspired Runtime Upgrade — 执行计划
 
 > 创建时间：2026-04-12
-> 最后更新：2026-04-12
+> 最后更新：2026-04-12（final report updated after 21 commits）
 > 触发方式：schedule trigger @ 2026-04-12 08:00 CST，autonomous 执行
 > 对应调研：[docs/research/hermes-agent-analysis.md](../../research/hermes-agent-analysis.md) 的 §3.1 - §3.6
 > 隔离：worktree `/Users/op7418/Documents/code/opus-4.6-test-hermes-impl`，分支 `feat/hermes-inspired-runtime-upgrade`
@@ -63,7 +63,7 @@
 | 3.3 | 渐进子目录 hint | ✅ 已完成 | (本 commit) | 完整 port，包含自写 shell tokenizer；20+ 测试（含真实文件系统 fixture）全通过；集成到 agent-tools.ts 推后到独立 follow-up |
 | 3.4 | Session 历史搜索 | ✅ 已完成 | (本 commit) | `searchMessages` DB 函数 + `codepilot_session_search` 工具 + builtin-tools 注册；12 测试含真实 SQLite DB fixture 全通过；**已完整 wire up**（与 memory-search 平级） |
 | 3.5a | 长对话压缩 - 接线 + token 预算 | ✅ 已完成 | (本 commit) | **重定位**：发现宏观 LLM 压缩已 wire 在 chat/route.ts。新增 `pruneOldToolResultsByBudget` 作为可选升级模块；`shouldAutoCompact` 标记 `@deprecated` 指向 `needsCompression` |
-| 3.5b | 长对话压缩 - LLM 摘要 | ✅ 已完成 | (本 commit) | **重定位**：LLM 摘要已存在，改为升级 `context-compressor.ts` 使用 `resolveAuxiliaryModel('compact')` 的 5 层 fallback 链；913 测试无回归 |
+| 3.5b | 长对话压缩 - LLM 摘要 | ✅ 已完成 | (本 commit) | **重定位**：LLM 摘要已存在，改为升级 `context-compressor.ts` 使用 `resolveAuxiliaryModel('compact')` 的 5 层 fallback 链；939 测试无回归 |
 | 3.6 | Skill 自动创建 nudge | ✅ 已完成 | (本 commit) | 纯函数 `shouldSuggestSkill` + `buildSkillNudgePayload` + agent-loop.ts wire up。阈值：step≥8 且 distinctTools≥3。SSE 通过 `status` 事件 subtype=`skill_nudge` 发射。**已完整 wire up** |
 
 **状态符号**：📋 待开始 / 🔄 进行中 / ✅ 已完成 / ⏸ blocked / ❌ 放弃
@@ -559,17 +559,19 @@ Port Hermes 的 `SubdirectoryHintTracker` 到 TS。在 tool call 完成后根据
 
 ---
 
-## Final Report — 2026-04-12 03:50（首版）+ 04:15（Codex review 修复）
+## Final Report — 2026-04-12 03:50（首版）+ 04:15（Codex round 1）+ 05:00（round 2）+ 14:40（功能扩展完结）
 
 ### 执行概览
 
 - **启动时间**：2026-04-12 00:55 CST（用户决定放弃 schedule trigger 后立即开始本地 autonomous 执行）
-- **首版完成**：2026-04-12 约 03:50 CST（~3 小时）
-- **Review 修复完成**：2026-04-12 约 04:15 CST（Codex 提出 3 个缺陷后 ~25 分钟闭环）
+- **首版完成**：2026-04-12 约 03:50 CST（~3 小时，7 个核心任务 + exec plan doc）
+- **Codex round 1 完成**：2026-04-12 约 04:15 CST（3 个缺陷修复 + 8 个回归测试）
+- **Codex round 2 完成**：2026-04-12 约 05:00 CST（收紧 Fix 1 + Fix 2 回归断言）
+- **功能扩展完成**：2026-04-12 约 14:40 CST（10 commits — 压缩通知、AskUserQuestion、Skill Nudge UI、i18n、bridge 守卫、SSE 测试、UI 修复）
 - **执行环境**：本地 worktree `/Users/op7418/Documents/code/opus-4.6-test-hermes-impl`，分支 `feat/hermes-inspired-runtime-upgrade`
 - **Git 纪律遵守情况**：✅ 无 push / tag / PR / 合并到主分支；所有改动仅在 worktree 内
-- **最终测试结果**：`npm run test` — **930 passing, 0 failing**（从基线 844 增加到 930，新增 86 个测试用例）
-- **累计改动**：20 files changed, ~3490 insertions(+), ~18 deletions(-)
+- **最终测试结果**：`npm run test` — **939 passing, 0 failing**（从基线 844 增加到 939，新增 95 个测试用例）
+- **累计改动**：32 files changed, 4281 insertions(+), 27 deletions(-)
 
 ### 任务状态总结
 
@@ -583,11 +585,20 @@ Port Hermes 的 `SubdirectoryHintTracker` 到 TS。在 tool call 完成后根据
 | 3.5b | 长对话压缩 - LLM 摘要 | ✅ 已完成 | `f125e0e` | **重定位并 wire up**（升级现有 context-compressor） |
 | 3.6 | Skill 自动创建 nudge | ✅ 已完成 | `5d50e03` | **完整 wire up** |
 
-**7/7 任务 done，0 blocked，0 skipped**
+**7/7 原计划任务 done，0 blocked，0 skipped** + **12 项超计划额外交付**（详见下方）
 
-### Commit 列表（按时间顺序）
+### Commit 列表（21 commits，newest-first）
 
 ```
+35699a0 fix(ui): require all questions answered before AskUserQuestion submit
+c757a9b test(bridge): add pure-function tests for AskUserQuestion deny guard
+8eaae7b fix(bridge): deny AskUserQuestion in bridge sessions + add SSE parsing tests
+023700a docs(ask-user-question): document bridge/IM limitation as known gap
+24d96e5 fix(sse): restore context-compressed window event after SSE payload change
+2308708 fix(i18n): add zh/en translations for Skill Nudge banner
+364373d feat(ui): add persistent Skill Nudge banner after complex workflows
+80a7c64 feat(runtime): human-readable compression notification + AskUserQuestion for Native Runtime
+fda1de2 docs(exec-plan): record round-2 Codex review of regression assertions
 be8b4cf test(hermes-upgrade): tighten Fix 1 + Fix 2 regression assertions (round 2 review)
 b05ad63 docs(exec-plan): record Codex review cycle in decision log + final report
 a5149cc fix(hermes-upgrade): address Codex review — session context, preset merge, SSE shape
@@ -604,26 +615,26 @@ e51c9d5 feat(provider): add resolveAuxiliaryModel with sdkProxyOnly fallback
 
 ### 测试结果
 
-**最后一次 `npm run test` 输出摘要**（含 Codex round 2 review 修复后）：
+**最后一次 `npm run test` 输出摘要**（含全部 21 commits 后）：
 ```
-# tests 931
-# suites 225
-# pass 931
+# tests 939
+# pass 939
 # fail 0
 # cancelled 0
 # skipped 0
-# duration_ms ~2660
 ```
 
 **新增测试覆盖**：
 - parallel-safety.test.ts：40+ 用例（4 层判定、destructive 命令、路径 overlap、路径提取）
-- provider-resolver.test.ts（追加）：20+ 用例（5 层解析链 + env override + 任务独立性 + 现场 smoke）
+- provider-resolver.test.ts（追加）：20+ 用例（5 层解析链 + env override + 任务独立性 + 现场 smoke + computeEffectiveRoleModels 5 分支单元测）
 - subdirectory-hint-tracker.test.ts：25+ 用例（祖先上溯、路径键、Bash 提取、截断、优先级）
 - session-search.test.ts：12 用例（真实 SQLite DB fixture）
 - context-pruner.test.ts：15+ 用例（legacy + 新预算模式 + estimate + deprecated）
-- skill-nudge.test.ts：10 用例（阈值 + payload）
+- skill-nudge.test.ts：10 用例（阈值 + payload + 阈值相对断言）
+- sse-stream.test.ts：3 用例（onContextCompressed / onSkillNudge 回调分发 + 负例泄漏检查）
+- permission-broker-bridge.test.ts：5 用例（AskUserQuestion deny guard 纯函数测试）
 
-总计新增 ~120 个测试用例，全部通过。
+总计新增 ~95 个测试用例，全部通过。
 
 ### 决策日志汇总
 
@@ -633,40 +644,70 @@ e51c9d5 feat(provider): add resolveAuxiliaryModel with sdkProxyOnly fallback
    - 3.5a 新增 `pruneOldToolResultsByBudget` 作为可选模块，标 `shouldAutoCompact` 为 `@deprecated`
    - 3.5b 把 `compressConversation` 的 `resolveProvider({ useCase: 'small' })` 升级为 `resolveAuxiliaryModel('compact')`，让现有 LLM 压缩享受 5 层 fallback（特别是 sdkProxyOnly 跨 provider fallback 和主模型兜底）——**这才是 3.2 + 3.5 的真实价值点**
 
+### 超计划额外交付（12 项）
+
+以下交付物不在原 §3.1-§3.6 计划范围内，是在 Codex review、手动测试和功能打通过程中自然产出的：
+
+| # | 交付物 | Commit | 说明 |
+|---|--------|--------|------|
+| E1 | 人类可读压缩通知 | `80a7c64` | chat/route.ts 的 `context_compressed` 从机器字符串升级为 `"Context compressed: N older messages summarized, ~X tokens saved"` + 结构化 stats |
+| E2 | AskUserQuestion 内置工具 | `80a7c64` | Native Runtime 缺少 SDK Runtime 的 AskUserQuestion 能力。新增 `builtin-tools/ask-user-question.ts`（Zod schema: 1-6 questions, 1-6 options, multiSelect）+ permission-checker ALWAYS_ASK_TOOLS + PermissionPrompt NEVER_AUTO_APPROVE |
+| E3 | Skill Nudge 前端 Banner | `364373d` | SSE `skill_nudge` 事件 → `useSSEStream.ts` onSkillNudge 回调 → `stream-session-manager.ts` window CustomEvent → `ChatView.tsx` 持久化 banner（"Save as Skill" 按钮 + dismiss） |
+| E4 | Skill Nudge i18n | `2308708` | `skillNudge.message` / `.saveButton` / `.savePrompt` 的 en + zh 翻译；banner 用前端模板替换 step/toolCount 而非后端英文字符串 |
+| E5 | context-compressed SSE 回归修复 | `24d96e5` | 80a7c64 改变 payload 形状后 `stream-session-manager.ts` 的旧 string check 不再命中 → 新增 `onContextCompressed` 专用回调恢复 ChatView hasSummary 翻转 |
+| E6 | AskUserQuestion bridge/IM 限制文档 | `023700a` | 在工具头部文档化 bridge session 无法使用 AskUserQuestion（permission broker 只支持 Allow/Deny，不支持 updatedInput） |
+| E7 | Bridge 交互式工具 deny guard | `8eaae7b` | `permission-broker.ts` 新增 `BRIDGE_UNSUPPORTED_INTERACTIVE_TOOLS`，在 full_access 自动批准之前拦截 AskUserQuestion，返回明确 deny 原因让模型 fallback 为纯文本提问 |
+| E8 | SSE 事件分发测试 | `8eaae7b` | 3 个 sse-stream.test.ts 用例锁定 onContextCompressed / onSkillNudge 回调分发契约 + 泄漏到 onStatus 的负例 |
+| E9 | Bridge deny guard 纯函数测试 | `c757a9b` | 提取 `isBridgeUnsupportedInteractiveTool()` 纯函数 + 5 个测试用例（覆盖 AskUserQuestion / 标准工具 / ExitPlanMode / codepilot_* / 未知工具） |
+| E10 | permission-registry timer.unref() | `c757a9b` | permission timeout timer 加 `.unref()` 防止 Node 进程在测试/关闭时挂起 |
+| E11 | AskUserQuestion 全部必答 UI 修复 | `35699a0` | PermissionPrompt 提交按钮从 `some()` 改为 `every()`，防止用户跳过问题提交空答案 |
+| E12 | Codex review round 2 断言收紧 | `be8b4cf` | Fix 1 测试重写为严格拒绝 pre-fix 会产出的 source 值；Fix 2 导出 `computeEffectiveRoleModels` 并直接单元测 5 个分支 |
+
 ### 未完成事项 / 已知问题
 
-#### 集成 / 后续 follow-up（需要独立 PR）
+#### 仅剩 3 项 wire-up 需要独立 follow-up
 
-1. **Task 3.1 — 并行安全调度器**：`parallel-safety.ts` 模块完整，但未 wire 进 `agent-tools.ts`。wire up 需要在 AI SDK 的 `tool({execute})` 层加一个 per-session mutex 或类似机制。建议的集成路径：
+1. **Task 3.1 — 并行安全调度器 wire**：`parallel-safety.ts` 模块完整，但未 wire 进 `agent-tools.ts`。wire up 需要在 AI SDK 的 `tool({execute})` 层加一个 per-session mutex 或类似机制。建议的集成路径：
    - 方案 A：共享 per-session Promise chain，不安全工具加锁，安全工具 bypass
    - 方案 B：在 agent-loop.ts 的 `fullStream` 事件流里 buffer tool-call 事件，攒够一批再做判定后派发
    - 两种方案都是独立 PR，难度中等
-2. **Task 3.3 — 子目录 hint**：`SubdirectoryHintTracker` 类完整，未 wire 进 agent-tools.ts 的 tool.execute 包装层。建议的集成路径：
+2. **Task 3.3 — 子目录 hint wire**：`SubdirectoryHintTracker` 类完整，未 wire 进 agent-tools.ts 的 tool.execute 包装层。建议的集成路径：
    - 在每个 tool 的 execute 包装后调用 `tracker.checkToolCall(name, args)`
    - 如果返回非 null，追加到 tool result 字符串末尾（保护 prompt cache）
    - 需要在 session 级别创建并复用 tracker 实例
+3. **Task 3.5a — token 预算裁剪 wire**：`pruneOldToolResultsByBudget` 模块已完成，但未接入 agent-loop.ts（避免与现有宏观压缩路径 chat/route.ts:273-341 冲突）。可作为可选增强在未来启用。
 
-#### 架构问题
+#### 架构问题（低优先级）
 
-3. **`ARCHITECTURE.md:3/:57` 过时**：仍写主链路为 Claude Agent SDK 单路径，与 `docs/handover/decouple-native-runtime.md` 的双 runtime 口径冲突。**未在本次批次处理**（按用户指示）。建议独立小修 PR。
+4. **`ARCHITECTURE.md:3/:57` 过时**：仍写主链路为 Claude Agent SDK 单路径，与 `docs/handover/decouple-native-runtime.md` 的双 runtime 口径冲突。**未在本次批次处理**（按用户指示）。建议独立小修 PR。
+
+#### AskUserQuestion bridge 支持（中优先级）
+
+5. **Bridge/IM AskUserQuestion**：当前在 bridge session 中被 deny guard 拦截。完整支持需要各平台（Telegram / Discord / Feishu / QQ）实现交互式卡片 UI，属于独立功能 PR。
 
 ### 建议下一步
 
 1. **代码 review**：
    ```bash
    cd /Users/op7418/Documents/code/opus-4.6-test-hermes-impl
-   git log main..HEAD
-   git diff main..HEAD
+   git log --oneline main..HEAD    # 21 commits
+   git diff --stat main..HEAD      # 32 files, +4281/-27
    ```
 2. **分支合并**（用户手动决定）：
-   - Worktree 分支 `feat/hermes-inspired-runtime-upgrade` 已包含 8 个 commit（含 exec plan）
-   - 合并建议：先 review 3.2/3.4/3.5/3.6 这 4 个已 wire up 的，确认无回归后合并
-   - 3.1/3.3 的 module-only 部分可以同批合并，wire up 留 follow-up
-3. **Worktree 清理**：合并后移除 worktree
+   - Worktree 分支 `feat/hermes-inspired-runtime-upgrade` 已包含 21 个 commit
+   - 已完整 wire up 的功能：3.2（辅助模型解析）、3.4（session search）、3.5b（压缩模型升级）、3.6（skill nudge 全栈含 UI）、AskUserQuestion（全栈）、压缩通知（全栈）
+   - Module-only 待 wire：3.1（并行安全）、3.3（子目录 hint）、3.5a（token 预算裁剪）
+   - 合并建议：全部一起合并——已 wire up 的直接生效，module-only 的不影响运行时行为
+3. **合并后 smoke test**：
+   - 启动 `npm run dev`，发送一条消息确认基本流程正常
+   - 发送 8+ step 的复杂任务，确认 Skill Nudge banner 出现
+   - 确认 AskUserQuestion 工具在 Native Runtime 下可触发
+4. **Worktree 清理**：
    ```bash
    git worktree remove ../opus-4.6-test-hermes-impl
    ```
-4. **归档 exec plan**：合并后把本文件移至 `docs/exec-plans/completed/`
+5. **归档 exec plan**：合并后把本文件移至 `docs/exec-plans/completed/`
+6. **后续 follow-up PR**：3 项 wire-up（3.1 / 3.3 / 3.5a）可以作为独立小 PR 逐个完成
 
 ### 附：对原研究稿的修正建议
 
