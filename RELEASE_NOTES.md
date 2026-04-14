@@ -1,6 +1,6 @@
-## CodePilot v0.50.0
+## CodePilot v0.50.1
 
-> 飞书一键创建机器人 + SubAgent UI 可视化 + 消息队列模式 + 桥接稳定性大修 — 推荐所有飞书桥接用户升级。
+> 飞书一键创建机器人 + SubAgent UI 可视化 + 消息队列模式 + 桥接稳定性大修 — 推荐所有飞书桥接用户升级。v0.50.0 因 CI lint 规则未通过构建未发布，v0.50.1 修复后重新发版。
 
 ### 新增功能
 
@@ -33,11 +33,11 @@
 ## 下载地址
 
 ### macOS
-- [Apple Silicon (M1/M2/M3/M4)](https://github.com/op7418/CodePilot/releases/download/v0.50.0/CodePilot-0.50.0-arm64.dmg)
-- [Intel](https://github.com/op7418/CodePilot/releases/download/v0.50.0/CodePilot-0.50.0-x64.dmg)
+- [Apple Silicon (M1/M2/M3/M4)](https://github.com/op7418/CodePilot/releases/download/v0.50.1/CodePilot-0.50.1-arm64.dmg)
+- [Intel](https://github.com/op7418/CodePilot/releases/download/v0.50.1/CodePilot-0.50.1-x64.dmg)
 
 ### Windows
-- [Windows 安装包](https://github.com/op7418/CodePilot/releases/download/v0.50.0/CodePilot.Setup.0.50.0.exe)
+- [Windows 安装包](https://github.com/op7418/CodePilot/releases/download/v0.50.1/CodePilot.Setup.0.50.1.exe)
 
 ## 安装说明
 
