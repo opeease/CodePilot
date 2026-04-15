@@ -41,6 +41,7 @@ import { FieldRow } from "@/components/patterns/FieldRow";
 import { ImportSessionDialog } from "@/components/layout/ImportSessionDialog";
 import { useClaudeStatus } from "@/hooks/useClaudeStatus";
 import { useTranslation } from "@/hooks/useTranslation";
+import { resolveLegacyRuntimeForDisplay, isConcreteRuntime } from "@/lib/runtime/legacy";
 import type { TranslationKey } from "@/i18n";
 import type { ProviderOptions } from "@/types";
 
@@ -124,20 +125,40 @@ export function CliSettingsSection() {
         setCliEnabled(appSettings.cli_enabled !== "false");
         // agent_runtime is now a two-value switch: 'claude-code-sdk' | 'native'.
         // Pre-0.50.3 default was 'auto'; migrate legacy rows in-place to the
-        // runtime that matches the current environment (CLI installed → SDK,
-        // otherwise Native). Saved back so the UI and backend stay aligned.
+        // runtime that matches the current environment. Saved back so the UI
+        // and backend stay aligned.
+        //
+        // We deliberately do NOT use the useClaudeStatus() hook value here —
+        // it's null on first render and only populates asynchronously. Using
+        // it would silently migrate CLI-installed users to 'native'. Instead
+        // we do a direct /api/claude-status fetch gated on the migration
+        // branch, and if that fetch itself fails we bail out of persistence
+        // entirely (keep the legacy 'auto' in the DB for a future retry,
+        // since the backend's resolveRuntime still tolerates it).
         const saved = appSettings.agent_runtime;
-        if (!saved || saved === 'auto') {
-          const cliInstalled = !!(claudeStatus?.connected);
-          const migrated = cliInstalled ? 'claude-code-sdk' : 'native';
-          setAgentRuntime(migrated);
-          // Fire-and-forget persist; handler failure just leaves the old
-          // 'auto' value which the backend still tolerates in resolveRuntime.
-          fetch('/api/settings/app', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ settings: { agent_runtime: migrated } }),
-          }).catch(() => { /* ignore */ });
+        if (!isConcreteRuntime(saved)) {
+          let cliConnected: boolean | null = null;
+          try {
+            const statusRes = await fetch('/api/claude-status');
+            if (statusRes.ok) {
+              const s = await statusRes.json();
+              cliConnected = !!s?.connected;
+            }
+          } catch { /* ignore — cliConnected stays null */ }
+
+          if (cliConnected !== null) {
+            const migrated = resolveLegacyRuntimeForDisplay(saved, cliConnected);
+            setAgentRuntime(migrated);
+            fetch('/api/settings/app', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ settings: { agent_runtime: migrated } }),
+            }).catch(() => { /* ignore */ });
+          } else {
+            // CLI status indeterminate — show a neutral default in the UI but
+            // don't persist. Next fetchSettings() can migrate correctly.
+            setAgentRuntime('claude-code-sdk');
+          }
         } else {
           setAgentRuntime(saved);
         }
