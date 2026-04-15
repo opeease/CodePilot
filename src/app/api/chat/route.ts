@@ -11,6 +11,7 @@ import { saveMediaToLibrary } from '@/lib/media-saver';
 import { wrapController } from '@/lib/safe-stream';
 import { ensureSchedulerRunning } from '@/lib/task-scheduler';
 import { predictNativeRuntime } from '@/lib/runtime';
+import { hasCodePilotProvider } from '@/lib/provider-presence';
 
 // Start the task scheduler on first API call
 ensureSchedulerRunning();
@@ -38,6 +39,21 @@ export async function POST(request: NextRequest) {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
+    }
+
+    // Precondition: CodePilot must have a provider configured. ~/.claude/settings.json
+    // (cc-switch, CLI login) is intentionally NOT counted — users with only that source
+    // are redirected to the setup flow to add a proper CodePilot provider.
+    if (!hasCodePilotProvider()) {
+      return new Response(
+        JSON.stringify({
+          error: 'No provider configured in CodePilot.',
+          code: 'NEEDS_PROVIDER_SETUP',
+          actionHint: 'open_setup_center',
+          initialCard: 'provider',
+        }),
+        { status: 412, headers: { 'Content-Type': 'application/json' } },
+      );
     }
 
     const session = getSession(session_id);

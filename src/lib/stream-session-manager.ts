@@ -305,8 +305,13 @@ async function runStream(stream: ActiveStream, params: StartStreamParams): Promi
     });
 
     if (!response.ok) {
-      const err = await response.json();
-      throw new Error(err.error || 'Failed to send message');
+      const err = await response.json().catch(() => ({}));
+      if (err?.code === 'NEEDS_PROVIDER_SETUP' && typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('open-setup-center', {
+          detail: { initialCard: err.initialCard ?? 'provider' },
+        }));
+      }
+      throw new Error(err?.error || 'Failed to send message');
     }
 
     const reader = response.body?.getReader();
