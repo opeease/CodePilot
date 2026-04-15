@@ -138,6 +138,13 @@ export function FileTree({ workingDirectory, onFileSelect, onFileAdd, highlightP
   const { t } = useTranslation();
   const seekKeyRef = useRef<string | null>(null);
 
+  // Clear stale tree data when switching projects to avoid cross-session seek races.
+  useEffect(() => {
+    setTree([]);
+    setError(null);
+    seekKeyRef.current = null;
+  }, [workingDirectory]);
+
   const fetchTree = useCallback(async () => {
     // Always cancel in-flight request first — even when clearing directory,
     // otherwise a stale response from the old project can arrive and repopulate the tree.
@@ -224,10 +231,9 @@ export function FileTree({ workingDirectory, onFileSelect, onFileAdd, highlightP
   // Scroll to and flash highlighted file from search results.
   // Guarded by seekKeyRef so tree auto-refreshes don't re-trigger the scroll.
   useEffect(() => {
-    if (!highlightPath || tree.length === 0) return;
-    const seekTargetKey = `${highlightPath}::${highlightSeek || ''}`;
+    if (!workingDirectory || !highlightPath || tree.length === 0) return;
+    const seekTargetKey = `${workingDirectory}::${highlightPath}::${highlightSeek || ''}`;
     if (seekKeyRef.current === seekTargetKey) return;
-    seekKeyRef.current = seekTargetKey;
 
     let attempts = 0;
     const maxAttempts = 15;
@@ -236,13 +242,14 @@ export function FileTree({ workingDirectory, onFileSelect, onFileAdd, highlightP
       const el = document.getElementById('file-tree-highlight');
       if (el) {
         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        seekKeyRef.current = seekTargetKey;
         clearInterval(interval);
       } else if (attempts >= maxAttempts) {
         clearInterval(interval);
       }
     }, 100);
     return () => clearInterval(interval);
-  }, [highlightPath, highlightSeek, tree]);
+  }, [workingDirectory, highlightPath, highlightSeek, tree]);
 
   return (
     <div className="flex flex-col h-full min-h-0">
