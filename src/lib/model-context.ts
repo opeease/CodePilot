@@ -19,6 +19,15 @@ export const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
   'claude-haiku-4-5-20251001': 200000,
 };
 
+// Substring fallback keys ordered by length (longest first) so a vendor-
+// prefixed or date-suffixed upstream name (e.g.
+// 'us.anthropic.claude-opus-4-7-v1:0') hits 'claude-opus-4-7' before
+// 'opus'. Without this, insertion order would make the short 'opus' alias
+// (200K) win and strip the real 1M window.
+const CONTEXT_LOOKUP_KEYS_BY_LENGTH = Object.keys(MODEL_CONTEXT_WINDOWS)
+  .slice()
+  .sort((a, b) => b.length - a.length);
+
 export function getContextWindow(
   model: string,
   options?: { context1m?: boolean; upstream?: string },
@@ -30,7 +39,7 @@ export function getContextWindow(
     ? options.upstream
     : model;
   const base = MODEL_CONTEXT_WINDOWS[lookupKey]
-    ?? MODEL_CONTEXT_WINDOWS[Object.keys(MODEL_CONTEXT_WINDOWS).find(k => lookupKey.includes(k)) ?? '']
+    ?? MODEL_CONTEXT_WINDOWS[CONTEXT_LOOKUP_KEYS_BY_LENGTH.find(k => lookupKey.includes(k)) ?? '']
     ?? null;
   if (base === null) return null;
   // When 1M context beta is enabled, all supported models get 1M window.
