@@ -192,7 +192,13 @@ export const PresetSchema = z.object({
 
 // ── Default Anthropic models ────────────────────────────────────
 
-// First-party Anthropic API: opus alias resolves to claude-opus-4-7.
+// Shared Anthropic catalog used by non-first-party providers
+// (anthropic-thirdparty, openrouter, ollama, litellm) and the generic
+// protocol fallback. Intentionally alias-only: third-party providers
+// often require their own upstream model names (OpenRouter goes through
+// the OpenAI SDK, LiteLLM expects user-configured names, etc.), and
+// forcing claude-opus-4-7 here would break those pass-through paths.
+// First-party Anthropic has its own catalog below.
 const ANTHROPIC_DEFAULT_MODELS: CatalogModel[] = [
   {
     modelId: 'sonnet',
@@ -206,15 +212,44 @@ const ANTHROPIC_DEFAULT_MODELS: CatalogModel[] = [
   },
   {
     modelId: 'opus',
-    // Pin opus alias to the explicit first-party model id so DB-backed
-    // Anthropic providers (anthropic-official / anthropic-thirdparty /
-    // openrouter / ollama / litellm) send "claude-opus-4-7" upstream
-    // instead of the raw "opus" alias. Without this, provider-resolver
-    // leaves resolved.upstreamModel === 'opus', which the native path
-    // forwards verbatim to @ai-sdk/anthropic and the 4.7 sanitizer
-    // regex in agent-loop.ts never matches. env provider has its own
-    // inline alias table (provider-resolver.ts:~674) which already
-    // points opus at claude-opus-4-7.
+    displayName: 'Opus',
+    role: 'opus',
+    capabilities: {
+      supportsEffort: true,
+      supportedEffortLevels: ['low', 'medium', 'high', 'max'],
+      supportsAdaptiveThinking: true,
+    },
+  },
+  {
+    modelId: 'haiku',
+    displayName: 'Haiku 4.5',
+    role: 'haiku',
+    capabilities: {
+      supportsEffort: true,
+      supportedEffortLevels: ['low', 'medium', 'high'],
+    },
+  },
+];
+
+// First-party Anthropic API (anthropic-official preset) — pins opus to
+// the explicit upstream ID so resolved.upstreamModel carries a concrete
+// model name downstream. This unblocks the Opus 4.7 sanitizer regex
+// in claude-model-options.ts (which matches upstream IDs, not aliases)
+// and guarantees the native path doesn't forward the bare "opus"
+// alias to @ai-sdk/anthropic.
+const ANTHROPIC_FIRST_PARTY_MODELS: CatalogModel[] = [
+  {
+    modelId: 'sonnet',
+    displayName: 'Sonnet 4.6',
+    role: 'sonnet',
+    capabilities: {
+      supportsEffort: true,
+      supportedEffortLevels: ['low', 'medium', 'high', 'max'],
+      supportsAdaptiveThinking: true,
+    },
+  },
+  {
+    modelId: 'opus',
     upstreamModelId: 'claude-opus-4-7',
     displayName: 'Opus 4.7',
     role: 'opus',
@@ -285,7 +320,7 @@ export const VENDOR_PRESETS: VendorPreset[] = [
     authStyle: 'api_key',
     baseUrl: 'https://api.anthropic.com',
     defaultEnvOverrides: {},
-    defaultModels: ANTHROPIC_DEFAULT_MODELS,
+    defaultModels: ANTHROPIC_FIRST_PARTY_MODELS,
     fields: ['api_key'],
     iconKey: 'anthropic',
     meta: {
@@ -873,8 +908,15 @@ export function getDefaultModelsForProvider(
     if (fuzzy) return fuzzy.defaultModels;
   }
 
-  // Protocol-based defaults (only when no preset matched)
-  if (protocol === 'anthropic' || protocol === 'openrouter' || protocol === 'bedrock' || protocol === 'vertex') {
+  // Protocol-based defaults (only when no preset matched).
+  // Bedrock/Vertex get the alias-only catalog with Opus 4.6 labels because
+  // their DB-backed provider has baseUrl='' and the preset match above
+  // never fires. Without this branch, they'd fall through to the shared
+  // Anthropic catalog and mis-resolve opus as first-party Opus 4.7.
+  if (protocol === 'bedrock' || protocol === 'vertex') {
+    return BEDROCK_VERTEX_DEFAULT_MODELS;
+  }
+  if (protocol === 'anthropic' || protocol === 'openrouter') {
     return ANTHROPIC_DEFAULT_MODELS;
   }
 
