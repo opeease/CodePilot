@@ -741,7 +741,7 @@ function buildResolution(
   }
 
   // Get available models: DB provider_models take priority, then catalog defaults
-  let availableModels = getDefaultModelsForProvider(protocol, provider.base_url);
+  let availableModels = getDefaultModelsForProvider(protocol, provider.base_url, provider.provider_type);
   try {
     const dbModels = getModelsForProvider(provider.id);
     if (dbModels.length > 0) {

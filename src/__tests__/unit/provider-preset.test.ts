@@ -204,4 +204,34 @@ describe('getDefaultModelsForProvider — provider-catalog flow', () => {
     const levels = opus?.capabilities?.supportedEffortLevels ?? [];
     assert.ok(levels.includes('xhigh'), 'first-party opus must advertise xhigh');
   });
+
+  it('legacy anthropic provider (provider_type=anthropic, baseUrl="") resolves to first-party catalog', () => {
+    // Migrated Default providers from older settings end up with
+    // provider_type='anthropic' and empty base_url. The native runtime
+    // treats them as api.anthropic.com; without the providerType hint
+    // they'd fall through to the alias-only catalog and bypass Opus 4.7
+    // sanitizer / xhigh / 1M window.
+    const models = getDefaultModelsForProvider('anthropic', '', 'anthropic');
+    const opus = models.find(m => m.modelId === 'opus');
+    assert.equal(
+      opus?.upstreamModelId,
+      'claude-opus-4-7',
+      'legacy empty-baseUrl anthropic must pin opus to claude-opus-4-7',
+    );
+    const levels = opus?.capabilities?.supportedEffortLevels ?? [];
+    assert.ok(levels.includes('xhigh'), 'legacy first-party opus must advertise xhigh');
+  });
+
+  it('missing providerType with empty baseUrl stays alias-only (no accidental first-party promotion)', () => {
+    // When provider_type is unknown or explicitly something else, the
+    // empty-baseUrl branch does NOT kick in — prevents, e.g., a third-
+    // party custom provider from being mis-labeled as first-party.
+    const models = getDefaultModelsForProvider('anthropic', '');
+    const opus = models.find(m => m.modelId === 'opus');
+    assert.equal(
+      opus?.upstreamModelId,
+      undefined,
+      'anthropic+empty baseUrl without providerType must remain alias-only',
+    );
+  });
 });

@@ -15,13 +15,17 @@ const OPENAI_OAUTH_MODELS = [
   { value: 'gpt-5.3-codex-spark', label: 'GPT-5.3-Codex-Spark' },
 ];
 
-// Default Claude model options (for the built-in 'env' provider)
+// Default Claude model options (for the built-in 'env' provider).
 // Capability metadata ensures `xhigh` appears in the effort dropdown even
 // before SDK capability discovery populates getCachedModels('env').
+// upstreamModelId mirrors provider-resolver.ts's envModels table so the
+// chat-page context indicator can resolve alias-specific windows
+// (env Opus alias = claude-opus-4-7 = 1M, vs Bedrock/Vertex opus = 200K).
 const DEFAULT_MODELS = [
   {
     value: 'sonnet',
     label: 'Sonnet 4.6',
+    upstreamModelId: 'claude-sonnet-4-20250514',
     supportsEffort: true,
     supportedEffortLevels: ['low', 'medium', 'high', 'max'],
     supportsAdaptiveThinking: true,
@@ -29,6 +33,7 @@ const DEFAULT_MODELS = [
   {
     value: 'opus',
     label: 'Opus 4.7',
+    upstreamModelId: 'claude-opus-4-7',
     supportsEffort: true,
     supportedEffortLevels: ['low', 'medium', 'high', 'xhigh', 'max'],
     supportsAdaptiveThinking: true,
@@ -36,10 +41,20 @@ const DEFAULT_MODELS = [
   {
     value: 'haiku',
     label: 'Haiku 4.5',
+    upstreamModelId: 'claude-haiku-4-5-20251001',
     supportsEffort: true,
     supportedEffortLevels: ['low', 'medium', 'high'],
   },
 ];
+
+// Short alias → upstream ID map for cached SDK models that may only
+// return bare aliases (sonnet/opus/haiku). Mirrors the env provider's
+// alias table in provider-resolver.ts.
+const ENV_ALIAS_TO_UPSTREAM: Record<string, string> = {
+  sonnet: 'claude-sonnet-4-20250514',
+  opus: 'claude-opus-4-7',
+  haiku: 'claude-haiku-4-5-20251001',
+};
 
 interface ModelEntry {
   value: string;
@@ -91,8 +106,10 @@ export async function GET() {
         provider_name: 'Claude Code',
         provider_type: 'anthropic',
         ...(!envHasDirectCredentials ? { sdkProxyOnly: true } : {}),
+        // Use upstreamModelId for context-window lookup so the bare `opus`
+        // alias doesn't get clamped to the 200K Bedrock/Vertex value.
         models: DEFAULT_MODELS.map(m => {
-          const cw = getContextWindow(m.value);
+          const cw = getContextWindow(m.value, { upstream: m.upstreamModelId });
           return cw != null ? { ...m, contextWindow: cw } : m;
         }),
       });
@@ -106,7 +123,11 @@ export async function GET() {
         const sdkModels = getCachedModels('env');
         if (sdkModels.length > 0) {
           envGroup.models = sdkModels.map(m => {
-            const cw = getContextWindow(m.value);
+            // SDK sometimes returns short aliases (e.g. 'opus') — map to
+            // the concrete upstream so context window and downstream
+            // sanitizer checks agree with the env provider's resolver.
+            const upstream = ENV_ALIAS_TO_UPSTREAM[m.value];
+            const cw = getContextWindow(m.value, { upstream });
             return {
               value: m.value,
               label: m.displayName,
@@ -114,6 +135,7 @@ export async function GET() {
               supportsEffort: m.supportsEffort,
               supportedEffortLevels: m.supportedEffortLevels,
               supportsAdaptiveThinking: m.supportsAdaptiveThinking,
+              ...(upstream ? { upstreamModelId: upstream } : {}),
               ...(cw != null ? { contextWindow: cw } : {}),
             };
           });
@@ -157,7 +179,7 @@ export async function GET() {
       } catch { /* table may not exist in old DBs */ }
 
       // 2) Catalog defaults
-      const catalogModels = getDefaultModelsForProvider(protocol, provider.base_url);
+      const catalogModels = getDefaultModelsForProvider(protocol, provider.base_url, provider.provider_type);
       const catalogRaw = catalogModels.map(m => ({
         value: m.modelId,
         label: m.displayName,

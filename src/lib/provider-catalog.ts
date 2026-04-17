@@ -878,11 +878,18 @@ export function findPresetForLegacy(baseUrl: string, providerType: string, proto
 /**
  * Get the default models for a provider based on its catalog preset.
  * If the provider has a matching preset, returns the preset's defaultModels.
- * Otherwise returns the Anthropic default models.
+ * Otherwise returns a protocol-appropriate fallback catalog.
+ *
+ * @param providerType — legacy provider_type string from DB (e.g. 'anthropic',
+ *   'bedrock'). Used to disambiguate baseUrl='' cases: a legacy
+ *   anthropic-typed provider with an empty baseUrl migrated from older
+ *   settings is treated as the official Anthropic endpoint (first-party
+ *   catalog), not a generic third-party proxy.
  */
 export function getDefaultModelsForProvider(
   protocol: Protocol,
   baseUrl: string,
+  providerType?: string,
 ): CatalogModel[] {
   // Try to find a preset by exact base_url
   const preset = VENDOR_PRESETS.find(p => p.baseUrl && p.baseUrl === baseUrl);
@@ -906,6 +913,17 @@ export function getDefaultModelsForProvider(
       } catch { return false; }
     });
     if (fuzzy) return fuzzy.defaultModels;
+  }
+
+  // Legacy first-party Anthropic: migrated Default providers have
+  // provider_type='anthropic' with base_url=''. The native runtime
+  // treats them as the official @ai-sdk/anthropic endpoint, so they
+  // must resolve opus to the concrete claude-opus-4-7 upstream (same
+  // as the anthropic-official preset). Without this branch they'd
+  // fall through to the alias-only catalog and bypass the 4.7
+  // sanitizer, 1M context, and xhigh metadata.
+  if (protocol === 'anthropic' && !baseUrl && providerType === 'anthropic') {
+    return ANTHROPIC_FIRST_PARTY_MODELS;
   }
 
   // Protocol-based defaults (only when no preset matched).

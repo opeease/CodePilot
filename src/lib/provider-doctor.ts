@@ -376,7 +376,7 @@ async function runProviderProbe(): Promise<ProbeResult> {
       if (dbModels.length > 0) hasModels = true;
     } catch { /* table may not exist */ }
     if (!hasModels) {
-      const catalogModels = getDefaultModelsForProvider(protocol, p.base_url);
+      const catalogModels = getDefaultModelsForProvider(protocol, p.base_url, p.provider_type);
       if (catalogModels.length > 0) hasModels = true;
     }
     // Also check role_models_json.default — it synthesizes a model entry at runtime
