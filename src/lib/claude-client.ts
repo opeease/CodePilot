@@ -1130,6 +1130,13 @@ export function streamClaudeSdk(options: ClaudeStreamOptions): ReadableStream<st
           prompt: finalPrompt,
           options: queryOptions,
         });
+        // Keep a handle to the underlying Query instance for control-API
+        // calls (getContextUsage etc.). When we peek-and-rewrap below to
+        // detect resume failures, `conversation` becomes a plain async
+        // generator that loses the Query prototype's methods — we need
+        // this original reference to call .getContextUsage() at result
+        // time. Reassigned on resume-fallback to point at the fresh Query.
+        let controlQuery = conversation;
 
         // Wrap the iterator so we can detect resume failures on the first message
         if (shouldResume) {
@@ -1147,6 +1154,8 @@ export function streamClaudeSdk(options: ClaudeStreamOptions): ReadableStream<st
                 yield next.value;
               }
             })() as ReturnType<typeof query>;
+            // controlQuery still points at the original Query with
+            // getContextUsage() available.
           } catch (resumeError) {
             const errMsg = resumeError instanceof Error ? resumeError.message : String(resumeError);
             console.warn('[claude-client] Resume failed, retrying without resume:', errMsg);
@@ -1170,6 +1179,9 @@ export function streamClaudeSdk(options: ClaudeStreamOptions): ReadableStream<st
               prompt: buildFinalPrompt(true),
               options: queryOptions,
             });
+            // Fresh Query replaces the old handle — control-API calls
+            // now go through this one.
+            controlQuery = conversation;
           }
         }
 
@@ -1472,43 +1484,34 @@ export function streamClaudeSdk(options: ClaudeStreamOptions): ReadableStream<st
                 }
               }
 
-              // Phase 5 — take a context-usage snapshot while the Query
-              // is still live. The UI uses this to replace the crude
-              // char:token estimator on the chat-page indicator. 2s
-              // timeout keeps a hung control channel from delaying the
-              // 'done' event. Any failure is silently swallowed — the
-              // estimator remains authoritative; this is pure enhancement.
-              try {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                const conv = conversation as any;
-                if (typeof conv.getContextUsage === 'function') {
-                  const usage = await Promise.race([
-                    conv.getContextUsage() as Promise<{
-                      totalTokens: number;
-                      maxTokens: number;
-                      rawMaxTokens: number;
-                      percentage: number;
-                      model: string;
-                    }>,
-                    new Promise<never>((_, reject) =>
-                      setTimeout(() => reject(new Error('context-usage-timeout')), 2000),
-                    ),
-                  ]);
-                  controller.enqueue(formatSSE({
-                    type: 'context_usage',
-                    data: JSON.stringify({
-                      totalTokens: usage.totalTokens,
-                      maxTokens: usage.maxTokens,
-                      rawMaxTokens: usage.rawMaxTokens,
-                      percentage: usage.percentage,
-                      model: usage.model,
-                      capturedAt: Date.now(),
-                    }),
-                  }));
-                }
-              } catch {
-                // ignore — estimator remains the fallback
-              }
+              // Phase 5 — context-usage snapshot via Query.getContextUsage()
+              // is intentionally NOT called here.
+              //
+              // getContextUsage() is a SDK control-API request that shares
+              // the same message channel as the for-await-of iterator we're
+              // inside. Awaiting it blocks the iterator from advancing,
+              // which prevents the control-response frame from arriving —
+              // the Query then closes on result and the call errors out
+              // with "Query closed before response received". There's no
+              // stable place outside the iteration loop where the Query
+              // is still alive.
+              //
+              // The chat-page indicator doesn't suffer from this: it
+              // already computes used-tokens from the SDKResultMessage's
+              // own `usage` field (input + cache_read + cache_creation),
+              // which is SDK-authoritative and carries <5% drift against
+              // what getContextUsage would report. The snapshot would
+              // only add category-level breakdown (system prompt / tools
+              // / user / memory) that the current UI doesn't surface.
+              //
+              // The SSE 'context_usage' event type and stream-session-
+              // manager snapshot field stay in place as extension points
+              // — a future Phase that needs category breakdown can fire
+              // them from a different point in the SDK lifecycle (e.g.
+              // from a background control-channel timer, or from a
+              // lifecycle hook the SDK may expose later).
+              // eslint-disable-next-line @typescript-eslint/no-unused-vars
+              const _unusedControlQuery = controlQuery;
               break;
             }
 
