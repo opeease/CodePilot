@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { VENDOR_PRESETS, PresetSchema, getDefaultModelsForProvider } from '../../lib/provider-catalog';
+import { VENDOR_PRESETS, PresetSchema, getDefaultModelsForProvider, getEffectiveProviderProtocol } from '../../lib/provider-catalog';
 
 describe('Preset Schema Validation', () => {
   for (const preset of VENDOR_PRESETS) {
@@ -220,6 +220,43 @@ describe('getDefaultModelsForProvider — provider-catalog flow', () => {
     );
     const levels = opus?.capabilities?.supportedEffortLevels ?? [];
     assert.ok(levels.includes('xhigh'), 'legacy first-party opus must advertise xhigh');
+  });
+
+  it('effective protocol: raw anthropic wins over inference', () => {
+    assert.equal(
+      getEffectiveProviderProtocol('custom', 'anthropic', ''),
+      'anthropic',
+      'non-empty valid raw protocol should be honored as-is',
+    );
+  });
+
+  it('effective protocol: empty raw protocol falls back to provider_type inference', () => {
+    // Legacy migrated rows have provider_type='anthropic' + protocol=''.
+    // They must resolve to 'anthropic' so write-path validation and doctor
+    // diagnostics treat them the same as an explicit 'anthropic' POST.
+    assert.equal(
+      getEffectiveProviderProtocol('anthropic', '', ''),
+      'anthropic',
+    );
+    assert.equal(
+      getEffectiveProviderProtocol('anthropic', undefined, ''),
+      'anthropic',
+    );
+  });
+
+  it('effective protocol: bedrock provider_type without raw protocol still classifies as bedrock', () => {
+    assert.equal(
+      getEffectiveProviderProtocol('bedrock', '', ''),
+      'bedrock',
+    );
+  });
+
+  it('effective protocol: unknown raw protocol falls back to inference', () => {
+    // A stray / legacy non-Protocol string in raw shouldn't pass through.
+    assert.equal(
+      getEffectiveProviderProtocol('anthropic', 'random-garbage', ''),
+      'anthropic',
+    );
   });
 
   it('missing providerType with empty baseUrl stays alias-only (no accidental first-party promotion)', () => {

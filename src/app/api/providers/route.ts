@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAllProviders, createProvider, getSetting } from '@/lib/db';
+import { getEffectiveProviderProtocol } from '@/lib/provider-catalog';
 import type { ProviderResponse, ErrorResponse, CreateProviderRequest, ApiProvider } from '@/types';
 
 function maskApiKey(provider: ApiProvider): ApiProvider {
@@ -69,7 +70,17 @@ export async function POST(request: NextRequest) {
     // routed to api.anthropic.com by the native SDK. Require explicit URL
     // on the write path so third-party configurations don't leak there.
     // Users wanting official Anthropic must pass 'https://api.anthropic.com'.
-    if (body.protocol === 'anthropic' && !body.base_url?.trim()) {
+    //
+    // Use effective protocol (raw → inferred) because body.protocol is
+    // optional; older clients or raw-API callers can post
+    // { provider_type: 'anthropic', base_url: '' } without protocol and
+    // still land in the same ambiguous state.
+    const effectiveProtocol = getEffectiveProviderProtocol(
+      body.provider_type ?? '',
+      body.protocol,
+      body.base_url ?? '',
+    );
+    if (effectiveProtocol === 'anthropic' && !body.base_url?.trim()) {
       return NextResponse.json<ErrorResponse>(
         {
           error: 'Anthropic-protocol providers must specify a base URL (use https://api.anthropic.com for the official API, or your third-party endpoint)',

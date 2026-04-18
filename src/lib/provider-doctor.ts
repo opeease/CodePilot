@@ -24,6 +24,7 @@ import {
 import {
   getDefaultModelsForProvider,
   inferProtocolFromLegacy,
+  getEffectiveProviderProtocol,
   findPresetForLegacy,
   type Protocol,
 } from '@/lib/provider-catalog';
@@ -358,11 +359,20 @@ async function runProviderProbe(): Promise<ProbeResult> {
 
   // Check each provider for common issues
   for (const p of providers) {
-    if (!p.base_url && p.protocol && !['anthropic'].includes(p.protocol)) {
+    // Compute effective protocol up-front — legacy Default rows have
+    // protocol='' and rely on inference; driving diagnostics off raw
+    // p.protocol would miss exactly those rows.
+    const protocol: Protocol = getEffectiveProviderProtocol(
+      p.provider_type,
+      p.protocol,
+      p.base_url,
+    );
+
+    if (!p.base_url && protocol !== 'anthropic') {
       findings.push({
         severity: 'warn',
         code: 'provider.missing-base-url',
-        message: `Provider "${p.name}" (${p.protocol}) has no base_url`,
+        message: `Provider "${p.name}" (${protocol}) has no base_url`,
         detail: `Provider ID: ${p.id}`,
       });
     }
@@ -375,7 +385,11 @@ async function runProviderProbe(): Promise<ProbeResult> {
     // We can't tell them apart without a persisted preset_key, so we
     // surface a warn + actionable suggestion either way. Write-path
     // validation (/api/providers) blocks new occurrences of this state.
-    if (!p.base_url && p.protocol === 'anthropic') {
+    //
+    // Uses the *effective* protocol so legacy rows with raw protocol=''
+    // — i.e. exactly the migrations we most want to flag — still get
+    // the diagnostic.
+    if (!p.base_url && protocol === 'anthropic') {
       findings.push({
         severity: 'warn',
         code: 'provider.anthropic-empty-base-url',
@@ -383,10 +397,6 @@ async function runProviderProbe(): Promise<ProbeResult> {
         detail: `Provider ID: ${p.id}. If this is the official Anthropic API, set base_url to https://api.anthropic.com. If it's a third-party proxy, set its endpoint URL. Empty base_url silently proxies to the official Anthropic endpoint and inherits first-party capabilities, which is almost never what a third-party configuration intends.`,
       });
     }
-
-    // Check if the provider has any available models
-    const protocol: Protocol = (p.protocol as Protocol) ||
-      inferProtocolFromLegacy(p.provider_type, p.base_url);
     let hasModels = false;
     try {
       const dbModels = getModelsForProvider(p.id);

@@ -777,6 +777,36 @@ export function getPresetsByCategory(category: 'chat' | 'media' = 'chat'): Vendo
   return VENDOR_PRESETS.filter(p => (p.category || 'chat') === category);
 }
 
+/** All valid Protocol union values — used for raw-field validation. */
+const VALID_PROTOCOLS = new Set<Protocol>([
+  'anthropic',
+  'openai-compatible',
+  'openrouter',
+  'bedrock',
+  'vertex',
+  'google',
+  'gemini-image',
+]);
+
+/**
+ * Compute the effective protocol for a provider — prefer the raw protocol
+ * field if it's a known Protocol value, otherwise fall back to
+ * inferProtocolFromLegacy(provider_type, base_url). Use this everywhere
+ * a write path, resolver, or diagnostic needs the "real" protocol: raw
+ * provider.protocol can legitimately be '' on legacy rows, and the POST
+ * API can see body.protocol === undefined from older clients.
+ */
+export function getEffectiveProviderProtocol(
+  providerType: string,
+  protocol: string | undefined,
+  baseUrl: string,
+): Protocol {
+  if (protocol && VALID_PROTOCOLS.has(protocol as Protocol)) {
+    return protocol as Protocol;
+  }
+  return inferProtocolFromLegacy(providerType, baseUrl);
+}
+
 /**
  * Infer the protocol from a legacy provider_type.
  * Used during migration from the old system.
