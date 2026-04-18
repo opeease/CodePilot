@@ -50,6 +50,15 @@ export interface SSECallbacks {
 }
 
 /**
+ * Notification codes that must persist past the next setStatusText() call.
+ * Scoped narrowly — only codes that represent one-shot decisions the user
+ * needs to see regardless of subsequent streaming progress belong here.
+ */
+const TOAST_STATUS_CODES = new Set<string>([
+  'RUNTIME_EFFORT_IGNORED', // Opus 4.7 on native runtime — explicit effort dropped
+]);
+
+/**
  * Parse a single SSE line (after stripping "data: " prefix) and dispatch
  * to the appropriate callback.  Returns the updated accumulated text.
  */
@@ -158,6 +167,21 @@ function handleSSEEvent(
             output_style: statusData.output_style,
           });
         } else if (statusData.notification) {
+          // Code-driven toasts: some status events (e.g. the Opus 4.7
+          // native-runtime RUNTIME_EFFORT_IGNORED warning) are one-shot
+          // decisions that must persist past the next status-text update.
+          // Route those through the global toast system so they survive
+          // the subsequent 'connected' / streaming status overwrite that
+          // setStatusText() would otherwise apply.
+          if (statusData.code && TOAST_STATUS_CODES.has(statusData.code)) {
+            void import('./useToast').then(({ showToast }) => {
+              showToast({
+                type: statusData.code === 'RUNTIME_EFFORT_IGNORED' ? 'warning' : 'info',
+                message: statusData.message || statusData.title || 'Status notification',
+                duration: 8000,
+              });
+            }).catch(() => { /* toast system unavailable — fall through to status text */ });
+          }
           callbacks.onStatus(statusData.message || statusData.title || undefined);
         } else {
           callbacks.onStatus(typeof event.data === 'string' ? event.data : undefined);
