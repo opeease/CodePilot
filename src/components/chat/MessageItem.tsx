@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect, useMemo, memo } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/lib/utils';
 import type { Message, TokenUsage, FileAttachment, MediaBlock } from '@/types';
 import {
@@ -11,8 +10,9 @@ import {
 } from '@/components/ai-elements/message';
 import { ToolActionsGroup } from '@/components/ai-elements/tool-actions-group';
 import { MediaPreview } from './MediaPreview';
+import { DiffSummary } from './DiffSummary';
 import { Button } from "@/components/ui/button";
-import { Copy, Check, CaretDown, CaretUp, CaretRight, NotePencil, PushPin, DownloadSimple } from "@/components/ui/icon";
+import { Copy, Check, CaretDown, CaretUp, CaretRight, PushPin, DownloadSimple } from "@/components/ui/icon";
 import { FileAttachmentDisplay } from './FileAttachmentDisplay';
 import { ImageGenConfirmation } from './ImageGenConfirmation';
 import { ImageGenCard } from './ImageGenCard';
@@ -528,49 +528,6 @@ function TokenUsageDisplay({ usage }: { usage: TokenUsage }) {
 
 const COLLAPSE_HEIGHT = 300;
 
-// ---------------------------------------------------------------------------
-// Diff summary — shows modified files after assistant turn
-// ---------------------------------------------------------------------------
-
-function DiffSummary({ files }: { files: Array<{ path: string; name: string }> }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <div className="mt-1">
-      <button
-        type="button"
-        onClick={() => setOpen(prev => !prev)}
-        className="flex items-center gap-1.5 text-[11px] text-muted-foreground/50 hover:text-muted-foreground transition-colors"
-      >
-        <CaretRight
-          size={10}
-          className={cn("shrink-0 transition-transform duration-200", open && "rotate-90")}
-        />
-        <span>Modified {files.length} file{files.length > 1 ? 's' : ''}</span>
-      </button>
-      <AnimatePresence initial={false}>
-        {open && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.15, ease: 'easeOut' }}
-            style={{ overflow: 'hidden' }}
-          >
-            <div className="ml-3 mt-0.5 space-y-0.5">
-              {files.map(f => (
-                <div key={f.path} className="flex items-center gap-1.5 text-[11px] font-mono text-muted-foreground/40">
-                  <NotePencil size={10} className="shrink-0" />
-                  <span className="truncate" title={f.path}>{f.name}</span>
-                </div>
-              ))}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
 export const MessageItem = memo(function MessageItem({ message, sessionId, isAssistantProject, assistantName }: MessageItemProps) {
   const isUser = message.role === 'user';
 
@@ -578,6 +535,12 @@ export const MessageItem = memo(function MessageItem({ message, sessionId, isAss
   const [isExpanded, setIsExpanded] = useState(false);
   const [isOverflowing, setIsOverflowing] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
+
+  // Preview wiring for DiffSummary (Phase 2.3). Clicking a previewable row
+  // opens the artifact panel on that file. setPreviewSource auto-flips
+  // previewOpen (see AppShell.tsx setPreviewSource side effects) so callers
+  // don't need to set both.
+  const { setPreviewSource } = usePanel();
 
 
   // Memoize expensive parsing: parseToolBlocks + pairTools
@@ -724,7 +687,14 @@ export const MessageItem = memo(function MessageItem({ message, sessionId, isAss
         if (modifiedFiles.length === 0) return null;
         // Deduplicate by path
         const unique = [...new Map(modifiedFiles.map(f => [f.path, f])).values()];
-        return <DiffSummary files={unique} />;
+        return (
+          <DiffSummary
+            files={unique}
+            onPreview={(file) => setPreviewSource({ kind: 'file', filePath: file.path })}
+            // onExportLongShot wiring arrives in Phase 3 when artifact:export-long-shot
+            // IPC is implemented. Until then the button stays hidden for every row.
+          />
+        );
       })()}
 
       {/* Footer with copy, timestamp and token usage */}
