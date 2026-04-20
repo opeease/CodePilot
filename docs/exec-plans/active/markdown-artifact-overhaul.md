@@ -25,7 +25,7 @@
 | Phase 2 | Artifact 网页预览扩展（工具结果落点 + 卡片 UI + PreviewPanel 扩展 .jsx/.tsx） | ✅ 已完成 | A 可见 | commits `812f905`/`151932d`/`6cfd28f`/`7fb7c17`：DiffSummary 抽组件（4 处改造）+ Artifact 卡片样式 + PreviewPanel 加 .jsx/.tsx 分支 + Sandpack 集成（s4 默认 sandbox）+ 5 个 i18n key |
 | Phase 3 | Artifact 网页一键导出长图（复用隐藏 BrowserWindow 通道） | ✅ 已完成 | A 可见 | commit `19adaae`：新 IPC artifact:export-long-shot + CDP captureBeyondViewport + 独立 session + module-level 导出锁 + PreviewPanel header 按钮 + DiffSummary 行按钮 + base64 Blob 下载。Markdown/JSX 的 render-to-HTML 预处理 + pngjs 回退为 follow-up |
 | Phase 4 | 文件树新建 `.md` + 通用 CodeMirror 编辑器（+ 写入 API 规范）+ Obsidian 兼容 | ✅ 已完成（P1 范围） | A 可见 | commits `8a54c56`/`20edd61`：`/api/files/write/mkdir/rename/delete` 四同级 API + FileIOError + path safety helpers + trash 包接系统回收站 + CodeMirror 6 MarkdownEditor（Compartment 主题切换）+ SkillEditor textarea 替换 + FileTreePanel "+" 新建 Markdown。frontmatter 高亮 / 图片粘贴 / 文件树右键菜单为 follow-up |
-| Phase 5 | 配套增强（ShikiThemeContext / Collapsible / 表格 Artifact + 导出 / LRU 核对） | 📋 待开始 | 混合 | 全部作为后续增强 |
+| Phase 5 | 配套增强（ShikiThemeContext / Collapsible / 表格 Artifact + 导出 / LRU 核对 / loadedPath / validateFsAccess / 产品边界文档） | ✅ 主体已完成（5.1/5.2 已决策跳过） | 混合 | 6 个子项落地：5.4 DataTable viewer、5.5 shared LRU、5.6 loadedPath、5.7 validateFsAccess、5.8 insights 文档；5.1 已被 useThemeFamily 机制覆盖不做；5.2 Collapsible 因 rehype-raw 依赖影响面过大，推到独立 follow-up |
 
 **状态符号：** 📋 待开始 / 🔄 进行中 / ✅ 已完成 / ⏸ blocked / ❌ 放弃
 
@@ -871,7 +871,11 @@ Response: { path, trashed: true } | { error: 'path_unsafe' | 'not_found' | 'dir_
 
 **价值形态：** 混合（下表分别标注）
 
-### 5.1 ShikiThemeContext 显式主题传递 — B 静默
+### 5.1 ShikiThemeContext 显式主题传递 — B 静默（**已合并到现有机制，不做**）
+
+**2026-04-21 复查结论：跳过。** craft-agents 的 `ShikiThemeContext` 解决的是"深色专属主题在浅色系统模式下 fallback 错乱"——CodePilot 的 `code-block.tsx:463-467` 已经走 `useThemeFamily` + `resolveShikiThemes` 显式传 [light, dark] 给 Shiki 的 `codeToTokens`，生成 dual-theme 输出后由 CSS 变量（`:root.dark`）切换，**不依赖 DOM class 嗅探**。额外加 Provider 是重复造轮子。若未来有新主题族引入，只需扩 `theme/code-themes.ts` 即可，无需新 Context。
+
+### 5.1 ShikiThemeContext（原文保留作历史参考）
 
 **用户痛点：** 当前暗色主题下某些代码块语言的 fallback 颜色错乱（依赖 DOM class 嗅探，时序不稳）
 
@@ -881,7 +885,11 @@ Response: { path, trashed: true } | { error: 'path_unsafe' | 'not_found' | 'dir_
 - **成本：** 1-2 人时
 - **验收：** 切换主题后代码块颜色立刻对齐，不闪；CDP 验证
 
-### 5.2 Collapsible 折叠 — A 可见（依赖 Phase 0.8）
+### 5.2 Collapsible 折叠 — A 可见（**已推到独立 follow-up**）
+
+**2026-04-21 复查结论：本批次不做。** POC 0.8 证实 Streamdown 的 `remarkPlugins` prop 能接标准 unified 插件，但要真的让 `<details><summary>` 渲染出来，还需要 Streamdown 底层的 `react-markdown` 启用 `rehype-raw`（默认不启）——否则生成的 raw HTML 会被 escape。这个 flag 牵涉到现有 sanitize 策略 + 全仓复用 `<Streamdown>` 的多个入口，影响面远超 Phase 5 预期。独立 follow-up：先评估 `rehype-raw` 对 streamdown 其他调用点（chat、doc preview）的安全影响，再决定是否开；或退而求其次用 MDAST 自定义节点 + 对应的 `components` 渲染器，绕开 raw HTML。
+
+### 5.2 Collapsible（原文保留作后续实施依据）
 
 **用户痛点：** 聊天里的长 AI 报告没法折叠，每次都要滚动
 
