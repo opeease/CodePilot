@@ -103,18 +103,33 @@ export function SandpackPreview({ filePath, content, bundlerURL }: SandpackPrevi
   const [mountToken] = useState(() => Math.random().toString(36).slice(2));
 
   const { files, setup, activeFile, providerKey } = useMemo(() => {
-    const mount = inferMountPath(filePath);
+    // Mount path is namespaced by mountToken so each SandpackPreview
+    // instance writes to a unique virtual filesystem path. This is the
+    // nuclear option against Sandpack's internal caching layers
+    // (bundler worker + service worker + compiled-module memoization),
+    // all of which key on the mount path: a path Sandpack has never
+    // seen is guaranteed to take the cold-compile codepath.
+    //
+    // Side effect: the app actually ends up rendering a fresh default-
+    // export module at /App.<token>.tsx. Relative imports inside the
+    // snippet still resolve against the virtual root (Sandpack's
+    // react-ts template entry is /index.tsx, which we override via
+    // activeFile to make the user's file the entry point).
+    const rawMount = inferMountPath(filePath);
+    const extMatch = rawMount.match(/\.(tsx|jsx)$/);
+    const ext = extMatch?.[0] ?? ".tsx";
+    const mount = `/App.${mountToken}${ext}`;
     const files: SandpackFiles = {
       [mount]: {
         code: content ?? "export default () => null;\n",
         active: true,
       },
     };
-    const setup: SandpackSetup = { dependencies: ALLOWED_DEPS };
-    // mountToken makes the key unique across file switches; content length
-    // covers the rare "same file, external content change" case (e.g. the
-    // user edits the .tsx elsewhere while the preview is still open).
-    const providerKey = `${mount}::${mountToken}::${content?.length ?? 0}`;
+    const setup: SandpackSetup = {
+      dependencies: ALLOWED_DEPS,
+      entry: mount,
+    };
+    const providerKey = `${mount}::${content?.length ?? 0}`;
     return { files, setup, activeFile: mount, providerKey };
   }, [filePath, content, mountToken]);
 
