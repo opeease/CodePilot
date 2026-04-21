@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { SetupCard } from './SetupCard';
 import { useTranslation } from '@/hooks/useTranslation';
@@ -14,13 +15,15 @@ interface ProviderCardProps {
    * its `persistAndClose` so clicking "Add Provider" / "Open provider
    * settings" closes the modal + marks setup_completed=true atomically,
    * avoiding the historical ping-pong where /settings re-opened SetupCenter
-   * on arrival.
+   * on arrival. Must be awaited — the PUT round-trip has to complete before
+   * the page unloads or the setup_completed flag gets lost to fetch abort.
    */
-  onBeforeNavigate?: () => void;
+  onBeforeNavigate?: () => Promise<void> | void;
 }
 
 export function ProviderCard({ status, onStatusChange, onBeforeNavigate }: ProviderCardProps) {
   const { t } = useTranslation();
+  const router = useRouter();
   const [providers, setProviders] = useState<ApiProvider[]>([]);
   const [envDetected, setEnvDetected] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -107,14 +110,19 @@ export function ProviderCard({ status, onStatusChange, onBeforeNavigate }: Provi
     } catch { /* ignore */ }
   }, [onStatusChange]);
 
-  const handleOpenProviders = useCallback(() => {
-    // Close SetupCenter first so /settings doesn't re-open it on arrival.
-    // Without this, AppShell's setupOpen check would race against the
-    // navigation and the user would see the modal flicker on the new page.
-    onBeforeNavigate?.();
-    // Navigate to settings providers section (SettingsLayout uses hash routing)
-    window.location.href = '/settings#providers';
-  }, [onBeforeNavigate]);
+  const handleOpenProviders = useCallback(async () => {
+    // Await persistAndClose so the /api/setup PUT has landed before we
+    // navigate — fire-and-forget used to race against the page unload when
+    // ProviderCard was in `not-configured` (the path where backend
+    // normalization CAN'T heal the state, since 3/3 isn't reached yet).
+    await onBeforeNavigate?.();
+    // router.push keeps the navigation inside the SPA so in-flight requests
+    // triggered by handlers that fire after onBeforeNavigate aren't aborted
+    // by a hard page unload. SettingsLayout's hashchange listener still
+    // picks up #providers for section routing (AppShell's hash bridge early-
+    // returns on /settings to avoid swallowing it).
+    router.push('/settings#providers');
+  }, [onBeforeNavigate, router]);
 
   const description = status === 'completed'
     ? t('setup.provider.configured')

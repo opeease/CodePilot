@@ -20,21 +20,35 @@ export function SetupCenter({ onClose, initialCard }: SetupCenterProps) {
   const [providerStatus, setProviderStatus] = useState<SetupCardStatus>('not-configured');
   const [projectStatus, setProjectStatus] = useState<SetupCardStatus>('not-configured');
   const [defaultProject, setDefaultProject] = useState<string | undefined>();
-  // Tracks whether the initial GET /api/setup has landed. Auto-close waits on
-  // this so we don't fire before we know what the user actually had.
-  const initialLoadedRef = useRef(false);
+  // Snapshot of the done/skipped count at the moment SetupCenter opened.
+  // Auto-close only fires when the user *made progress* this session —
+  // i.e. went from N<3 to 3. Users who manually open SetupCenter at 3/3
+  // (e.g. from a skipped ProviderCard's "Open provider settings" link or
+  // any future dedicated entry) keep the modal visible until they close it
+  // themselves. The stale "3/3 without setup_completed" case is healed by
+  // the GET /api/setup normalization, so this gate no longer needs to
+  // defend against it.
+  const initialCompletedCountRef = useRef<number | null>(null);
 
   // Single helper that every "close the setup center" path goes through.
-  // Persists setup_completed=true (fire-and-forget — failure is already
-  // handled server-side by the GET normalization on next open) and calls
-  // onClose. De-duped so the "skip and enter" button, auto-close, and any
-  // future close trigger all write the same flag.
-  const persistAndClose = useCallback(() => {
-    fetch('/api/setup', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ card: 'completed', status: 'completed' }),
-    }).catch(() => {});
+  // Awaits the PUT so callers that immediately navigate (e.g. ProviderCard's
+  // "Add Provider" jump to /settings) can guarantee setup_completed is
+  // persisted before page change — otherwise the fire-and-forget fetch can
+  // be aborted by the unload and the next mount would re-open SetupCenter.
+  // `keepalive: true` is belt-and-suspenders for any future path that
+  // bypasses the await contract.
+  const persistAndClose = useCallback(async () => {
+    try {
+      await fetch('/api/setup', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ card: 'completed', status: 'completed' }),
+        keepalive: true,
+      });
+    } catch {
+      // Swallow — backend GET /api/setup normalization patches stale state
+      // on next mount, so a failed PUT degrades gracefully.
+    }
     onClose();
   }, [onClose]);
 
@@ -48,23 +62,27 @@ export function SetupCenter({ onClose, initialCard }: SetupCenterProps) {
           setProviderStatus(data.provider);
           setProjectStatus(data.project);
           if (data.defaultProject) setDefaultProject(data.defaultProject);
+          const initial = [data.claude, data.provider, data.project]
+            .filter((s: string) => s === 'completed' || s === 'skipped').length;
+          initialCompletedCountRef.current = initial;
         }
-        initialLoadedRef.current = true;
       })
-      .catch(() => {
-        initialLoadedRef.current = true;
-      });
+      .catch(() => {});
   }, []);
 
   const completedCount = [claudeStatus, providerStatus, projectStatus]
     .filter(s => s === 'completed' || s === 'skipped').length;
 
-  // Auto-close whenever all three cards land in a done/skipped state. Backend
-  // GET /api/setup also normalizes this so stale 3/3 states get patched on
-  // next open — but we still persist + close here to give the user immediate
-  // UI feedback without a reload.
+  // Auto-close when the user makes progress this session from not-done to
+  // 3/3. `initialCompletedCountRef.current < 3` is what distinguishes an
+  // onboarding flow ending (close automatically) from a manually-opened
+  // modal at 3/3 (leave it visible, user will close it themselves).
   useEffect(() => {
-    if (completedCount === 3 && initialLoadedRef.current) {
+    if (
+      completedCount === 3 &&
+      initialCompletedCountRef.current !== null &&
+      initialCompletedCountRef.current < 3
+    ) {
       const timer = setTimeout(persistAndClose, 800);
       return () => clearTimeout(timer);
     }
