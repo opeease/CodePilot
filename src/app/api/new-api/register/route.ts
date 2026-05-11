@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { bindNewApiAccount, getNewApiLoginStatus } from '@/lib/new-api-client';
+import { registerNewApiAccount } from '@/lib/new-api-client';
 import type { ErrorResponse } from '@/types';
 
 function maskProvider<T extends { api_key?: string }>(provider: T): T {
@@ -8,21 +8,16 @@ function maskProvider<T extends { api_key?: string }>(provider: T): T {
   return { ...provider, api_key: `***${apiKey.slice(-8)}` };
 }
 
-export async function GET() {
-  const status = getNewApiLoginStatus();
-  return NextResponse.json({
-    ...status,
-    provider: status.provider ? maskProvider(status.provider) : undefined,
-  });
-}
-
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const result = await bindNewApiAccount({
+    const result = await registerNewApiAccount({
       baseUrl: body?.baseUrl,
       username: body?.username,
       password: body?.password,
+      email: body?.email,
+      verificationCode: body?.verificationCode,
+      affCode: body?.affCode,
     });
 
     return NextResponse.json({
@@ -33,7 +28,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     return NextResponse.json<ErrorResponse>(
-      { error: error instanceof Error ? error.message : 'Failed to bind New API account' },
+      { error: error instanceof Error ? error.message : 'Failed to register New API account' },
       { status: 400 },
     );
   }

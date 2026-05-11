@@ -27,6 +27,7 @@ import { Toaster } from '@/components/ui/toast';
 import { useNotificationPoll } from '@/hooks/useNotificationPoll';
 import { useGlobalSearchShortcut } from '@/hooks/useGlobalSearchShortcut';
 import { GlobalSearchDialog } from './GlobalSearchDialog';
+import { DelaokeLoginGate } from '@/components/auth/DelaokeLoginGate';
 
 const SPLIT_SESSIONS_KEY = "codepilot:split-sessions";
 const SPLIT_ACTIVE_COLUMN_KEY = "codepilot:split-active-column";
@@ -503,6 +504,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <ImageGenContext.Provider value={imageGenValue}>
         <BatchImageGenContext.Provider value={batchImageGenValue}>
         <TooltipProvider delayDuration={300}>
+          <DelaokeLoginGate>
           <div className="flex h-screen overflow-hidden">
             <ErrorBoundary>
               <ChatListPanel
@@ -542,6 +544,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               initialCard={setupInitialCard}
             />
           )}
+          </DelaokeLoginGate>
         </TooltipProvider>
         </BatchImageGenContext.Provider>
         </ImageGenContext.Provider>

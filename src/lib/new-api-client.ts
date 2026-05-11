@@ -1,4 +1,4 @@
-import { createProvider, getAllProviders, setDefaultProviderId, updateProvider, upsertProviderModel } from '@/lib/db';
+import { createProvider, getAllProviders, getSetting, setDefaultProviderId, setSetting, updateProvider, upsertProviderModel } from '@/lib/db';
 import type { ApiProvider } from '@/types';
 
 export interface BindNewApiInput {
@@ -7,12 +7,28 @@ export interface BindNewApiInput {
   password?: string;
 }
 
+export interface RegisterNewApiInput extends BindNewApiInput {
+  email?: string;
+  verificationCode?: string;
+  affCode?: string;
+}
+
 export interface BindNewApiResult {
   provider: ApiProvider;
   models: string[];
+  username: string;
+}
+
+export interface NewApiLoginStatus {
+  baseUrl: string;
+  loggedIn: boolean;
+  username?: string;
+  provider?: ApiProvider;
 }
 
 const DEFAULT_NEW_API_BASE_URL = process.env.NEW_API_BASE_URL || 'https://server.opeease.com:3000';
+const NEW_API_LOGIN_USERNAME_KEY = 'delaoke:new-api:username';
+const NEW_API_LOGIN_AT_KEY = 'delaoke:new-api:login-at';
 
 function normalizeBaseUrl(baseUrl?: string): string {
   const value = (baseUrl || DEFAULT_NEW_API_BASE_URL).trim().replace(/\/+$/, '');
@@ -79,6 +95,10 @@ function extractStringByKeys(value: unknown, keys: Set<string>): string | undefi
 }
 
 function extractApiKey(value: unknown): string | undefined {
+  if (typeof value === 'string' && value.trim()) return value.trim();
+  if (!value || typeof value !== 'object') return undefined;
+  const data = (value as Record<string, unknown>).data;
+  if (typeof data === 'string' && data.trim()) return data.trim();
   return extractStringByKeys(value, new Set([
     'key',
     'token',
@@ -88,7 +108,12 @@ function extractApiKey(value: unknown): string | undefined {
   ].map((k) => k.toLowerCase())));
 }
 
-async function login(baseUrl: string, username: string, password: string): Promise<string> {
+interface NewApiSession {
+  cookie: string;
+  userId: number;
+}
+
+async function login(baseUrl: string, username: string, password: string): Promise<NewApiSession> {
   const res = await fetch(`${baseUrl}/api/user/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -104,10 +129,40 @@ async function login(baseUrl: string, username: string, password: string): Promi
   if (!cookie) {
     throw new Error('New API login did not return a session cookie');
   }
-  return cookie;
+  const userId = Number((body as { data?: { id?: unknown } })?.data?.id);
+  if (!Number.isFinite(userId) || userId <= 0) {
+    throw new Error('New API login did not return a user id');
+  }
+  return { cookie, userId };
 }
 
-async function createUserApiKey(baseUrl: string, cookie: string): Promise<string> {
+async function register(baseUrl: string, input: {
+  username: string;
+  password: string;
+  email?: string;
+  verificationCode?: string;
+  affCode?: string;
+}): Promise<void> {
+  const res = await fetch(`${baseUrl}/api/user/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      username: input.username,
+      password: input.password,
+      ...(input.email ? { email: input.email } : {}),
+      ...(input.verificationCode ? { verification_code: input.verificationCode } : {}),
+      ...(input.affCode ? { aff_code: input.affCode } : {}),
+    }),
+  });
+  const body = await readJson(res);
+  if (!res.ok) {
+    const record = body && typeof body === 'object' ? body as Record<string, unknown> : {};
+    throw new Error(String(record.message || record.error || `New API registration failed (${res.status})`));
+  }
+  assertNewApiSuccess(body, 'New API registration failed');
+}
+
+async function createUserApiKey(baseUrl: string, session: NewApiSession): Promise<string> {
   const tokenName = `delaoke-${new Date().toISOString().slice(0, 10)}`;
   const body = {
     name: tokenName,
@@ -120,7 +175,8 @@ async function createUserApiKey(baseUrl: string, cookie: string): Promise<string
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Cookie: cookie,
+      Cookie: session.cookie,
+      'New-Api-User': String(session.userId),
     },
     body: JSON.stringify(body),
   });
@@ -129,11 +185,45 @@ async function createUserApiKey(baseUrl: string, cookie: string): Promise<string
     throw new Error(`New API token creation failed (${res.status})`);
   }
   assertNewApiSuccess(json, 'New API token creation failed');
-  const apiKey = extractApiKey(json);
+  let apiKey = extractApiKey(json);
+  if (!apiKey || apiKey.includes('*')) {
+    apiKey = await fetchLatestTokenKey(baseUrl, session, tokenName);
+  }
   if (!apiKey) {
     throw new Error('New API token response did not include an API key');
   }
   return apiKey;
+}
+
+async function fetchLatestTokenKey(baseUrl: string, session: NewApiSession, tokenName: string): Promise<string | undefined> {
+  const listRes = await fetch(`${baseUrl}/api/token/?p=0&page_size=20`, {
+    headers: {
+      Cookie: session.cookie,
+      'New-Api-User': String(session.userId),
+    },
+  });
+  const listJson = await readJson(listRes);
+  if (!listRes.ok) {
+    throw new Error(`New API token lookup failed (${listRes.status})`);
+  }
+  assertNewApiSuccess(listJson, 'New API token lookup failed');
+  const items = (listJson as { data?: { items?: Array<{ id?: number; name?: string }> } })?.data?.items || [];
+  const token = items.find((item) => item.name === tokenName) || items[0];
+  if (!token?.id) return undefined;
+
+  const keyRes = await fetch(`${baseUrl}/api/token/${token.id}/key`, {
+    method: 'POST',
+    headers: {
+      Cookie: session.cookie,
+      'New-Api-User': String(session.userId),
+    },
+  });
+  const keyJson = await readJson(keyRes);
+  if (!keyRes.ok) {
+    throw new Error(`New API token key fetch failed (${keyRes.status})`);
+  }
+  assertNewApiSuccess(keyJson, 'New API token key fetch failed');
+  return extractApiKey(keyJson);
 }
 
 async function fetchModels(openAiBaseUrl: string, apiKey: string): Promise<string[]> {
@@ -211,14 +301,46 @@ export async function bindNewApiAccount(input: BindNewApiInput): Promise<BindNew
     throw new Error('New API username and password are required');
   }
 
-  const cookie = await login(baseUrl, username, password);
-  const apiKey = await createUserApiKey(baseUrl, cookie);
+  const session = await login(baseUrl, username, password);
+  const apiKey = await createUserApiKey(baseUrl, session);
   const openAiBaseUrl = `${baseUrl}/v1`;
   const models = await fetchModels(openAiBaseUrl, apiKey);
   const provider = upsertNewApiProvider(baseUrl, apiKey, models);
-  return { provider, models };
+  setSetting(NEW_API_LOGIN_USERNAME_KEY, username);
+  setSetting(NEW_API_LOGIN_AT_KEY, new Date().toISOString());
+  return { provider, models, username };
+}
+
+export async function registerNewApiAccount(input: RegisterNewApiInput): Promise<BindNewApiResult> {
+  const baseUrl = normalizeBaseUrl(input.baseUrl);
+  const username = input.username?.trim();
+  const password = input.password || '';
+  if (!username || !password) {
+    throw new Error('New API username and password are required');
+  }
+
+  await register(baseUrl, {
+    username,
+    password,
+    email: input.email?.trim(),
+    verificationCode: input.verificationCode?.trim(),
+    affCode: input.affCode?.trim(),
+  });
+  return bindNewApiAccount({ baseUrl, username, password });
 }
 
 export function getDefaultNewApiBaseUrl(): string {
   return DEFAULT_NEW_API_BASE_URL;
+}
+
+export function getNewApiLoginStatus(baseUrl?: string): NewApiLoginStatus {
+  const normalizedBaseUrl = normalizeBaseUrl(baseUrl);
+  const provider = getAllProviders().find((item) => item.base_url === `${normalizedBaseUrl}/v1`);
+  const username = getSetting(NEW_API_LOGIN_USERNAME_KEY);
+  return {
+    baseUrl: normalizedBaseUrl,
+    loggedIn: !!(username && provider?.api_key),
+    ...(username ? { username } : {}),
+    ...(provider ? { provider } : {}),
+  };
 }

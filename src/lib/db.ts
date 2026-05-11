@@ -867,13 +867,10 @@ function migrateDb(db: Database.Database): void {
     }
   }
 
-  // Migration: remove explicitly openai-compatible providers (SDK does not support them)
-  // and backfill empty protocol for legacy custom providers using URL-based inference.
+  // Migration: backfill empty protocol for legacy custom providers using URL-based inference.
   try {
     const providerCols = db.prepare("PRAGMA table_info(api_providers)").all() as { name: string }[];
     if (providerCols.some(c => c.name === 'protocol')) {
-      db.exec("DELETE FROM api_providers WHERE protocol = 'openai-compatible'");
-
       // Backfill empty protocol for legacy custom providers — infer from base_url.
       // These are valid Anthropic-compatible providers (GLM, Kimi, MiniMax, etc.)
       // that were created before the protocol column existed.
