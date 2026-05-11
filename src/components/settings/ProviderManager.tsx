@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -73,6 +74,14 @@ export function ProviderManager() {
   const [openaiLoggingIn, setOpenaiLoggingIn] = useState(false);
   const [openaiError, setOpenaiError] = useState<string | null>(null);
 
+  // New API account binding
+  const [newApiBaseUrl, setNewApiBaseUrl] = useState('https://server.opeease.com:3000');
+  const [newApiUsername, setNewApiUsername] = useState('');
+  const [newApiPassword, setNewApiPassword] = useState('');
+  const [newApiBinding, setNewApiBinding] = useState(false);
+  const [newApiMessage, setNewApiMessage] = useState<string | null>(null);
+  const [newApiError, setNewApiError] = useState<string | null>(null);
+
   // Doctor dialog state
   const [doctorOpen, setDoctorOpen] = useState(false);
 
@@ -136,6 +145,13 @@ export function ProviderManager() {
     fetch('/api/openai-oauth/status')
       .then(r => r.ok ? r.json() : null)
       .then(data => { if (data) setOpenaiAuth(data); })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    fetch('/api/new-api/bind')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data?.baseUrl) setNewApiBaseUrl(data.baseUrl); })
       .catch(() => {});
   }, []);
 
@@ -345,6 +361,38 @@ export function ProviderManager() {
     }
   };
 
+  const handleNewApiBind = async () => {
+    setNewApiBinding(true);
+    setNewApiError(null);
+    setNewApiMessage(null);
+    try {
+      const res = await fetch('/api/new-api/bind', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          baseUrl: newApiBaseUrl,
+          username: newApiUsername,
+          password: newApiPassword,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || 'New API login failed');
+      }
+      setNewApiPassword('');
+      setNewApiMessage(isZh
+        ? `已绑定 ${data.provider?.name || '德劳克 New API'}，并设为默认服务商`
+        : `Bound ${data.provider?.name || 'Delaoke New API'} and set it as the default provider`);
+      await fetchProviders();
+      fetchModels();
+      window.dispatchEvent(new Event('provider-changed'));
+    } catch (err) {
+      setNewApiError(err instanceof Error ? err.message : 'New API login failed');
+    } finally {
+      setNewApiBinding(false);
+    }
+  };
+
   const handleOpenAILogout = async () => {
     try {
       await fetch("/api/openai-oauth/status", { method: "DELETE" });
@@ -540,6 +588,70 @@ export function ProviderManager() {
             <p className="text-[11px] text-muted-foreground ml-[34px] leading-relaxed">
               {t('provider.ccSwitchHint')}
             </p>
+          </div>
+
+          {/* Delaoke New API login */}
+          <div className="border-b border-border/30 pb-3">
+            <div className="flex items-start gap-3 py-2.5 px-1">
+              <div className="shrink-0 w-[22px] flex justify-center">
+                <span className="text-sm font-bold">德</span>
+              </div>
+              <div className="flex-1 min-w-0 space-y-2">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium">德劳克账号</span>
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                      New API
+                    </Badge>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    {isZh
+                      ? '客户用 New API 账号登录后，德劳克会自动生成 API Key 并绑定为默认服务商。'
+                      : 'Sign in with a New API account to create an API key and bind it as the default provider.'}
+                  </p>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-[1.2fr_0.8fr_0.8fr_auto]">
+                  <Input
+                    value={newApiBaseUrl}
+                    onChange={(event) => setNewApiBaseUrl(event.target.value)}
+                    placeholder="https://server.opeease.com:3000"
+                    className="h-8 text-xs"
+                  />
+                  <Input
+                    value={newApiUsername}
+                    onChange={(event) => setNewApiUsername(event.target.value)}
+                    placeholder={isZh ? '用户名' : 'Username'}
+                    className="h-8 text-xs"
+                  />
+                  <Input
+                    type="password"
+                    value={newApiPassword}
+                    onChange={(event) => setNewApiPassword(event.target.value)}
+                    placeholder={isZh ? '密码' : 'Password'}
+                    className="h-8 text-xs"
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' && !newApiBinding) handleNewApiBind();
+                    }}
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 text-xs"
+                    onClick={handleNewApiBind}
+                    disabled={newApiBinding || !newApiUsername || !newApiPassword || !newApiBaseUrl}
+                  >
+                    {newApiBinding && <SpinnerGap size={12} className="animate-spin" />}
+                    {isZh ? '登录绑定' : 'Bind'}
+                  </Button>
+                </div>
+                {newApiMessage && (
+                  <p className="text-[11px] text-status-success-foreground">{newApiMessage}</p>
+                )}
+                {newApiError && (
+                  <p className="text-[11px] text-destructive">{newApiError}</p>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* OpenAI OAuth login */}

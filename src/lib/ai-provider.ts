@@ -69,7 +69,7 @@ export function createModel(opts: CreateModelOptions = {}): CreateModelResult {
     // runtime can. Point users at the fix instead of the generic message.
     if (hasClaudeSettingsCredentials()) {
       throw new Error(
-        'Credentials found in ~/.claude/settings.json (managed by cc-switch or similar), but the Native runtime cannot read them. Switch the runtime to "Claude Code SDK" in Settings → Runtime, or add the provider to CodePilot directly.',
+        'Credentials found in ~/.claude/settings.json (managed by cc-switch or similar), but the Native runtime cannot read them. Switch the runtime to "Claude Code SDK" in Settings → Runtime, or add the provider to 德劳克 directly.',
       );
     }
     throw new Error(

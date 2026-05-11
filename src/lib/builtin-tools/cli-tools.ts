@@ -745,7 +745,7 @@ export function createCliToolsTools() {
 
           const verStr = newVersion ? ` (now v${newVersion})` : '';
           const warning = provenanceIsGuessed
-            ? `\n\nNote: The install method was guessed (${updateMethod}) because this tool was installed outside CodePilot. If the update failed, it may have been installed via a different package manager.`
+            ? `\n\nNote: The install method was guessed (${updateMethod}) because this tool was installed outside 德劳克. If the update failed, it may have been installed via a different package manager.`
             : '';
           return `Updated "${displayName}"${verStr}.\nCommand: ${updateCmd}\n${output.slice(0, 500)}${warning}`;
         } catch (error) {

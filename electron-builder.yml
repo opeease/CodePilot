@@ -1,8 +1,8 @@
-appId: com.codepilot.app
-productName: CodePilot
+appId: com.delaoke.app
+productName: 德劳克
 publish:
   provider: github
-  owner: op7418
+  owner: opeease
   repo: CodePilot
 directories:
   output: release
@@ -65,7 +65,7 @@ win:
   icon: build/icon.ico
   target:
     - target: nsis
-      arch: [x64, arm64]
+      arch: [x64]
 nsis:
   oneClick: false
   perMachine: false
@@ -80,10 +80,10 @@ linux:
   artifactName: "${productName}-${version}-${arch}.${ext}"
   desktop:
     entry:
-      Name: CodePilot
+      Name: 德劳克
       Comment: A native desktop GUI for Claude Code
       Categories: Development;IDE;
-      StartupWMClass: codepilot
+      StartupWMClass: delaoke
   # arch is NOT specified here — controlled by CI via --x64 / --arm64 CLI flags.
   # Listing both arches here causes electron-builder to build both on every job,
   # which fails when cross-compiling native modules (zlib-sync -m64 on arm64).

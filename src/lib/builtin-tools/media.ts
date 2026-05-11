@@ -14,7 +14,7 @@ You have access to media tools:
 export function createMediaTools(options?: { sessionId?: string; workingDirectory?: string }) {
   return {
     codepilot_import_media: tool({
-      description: 'Import a local file (image, video, audio) into the CodePilot media library.',
+      description: 'Import a local file (image, video, audio) into the 德劳克 media library.',
       inputSchema: z.object({
         filePath: z.string().describe('Path to the local file'),
         title: z.string().optional(),

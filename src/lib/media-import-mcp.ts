@@ -44,7 +44,7 @@ export function createMediaImportMcpServer(sessionId?: string, workingDirectory?
     tools: [
       tool(
         'codepilot_import_media',
-        'Import a local file (image, video, audio) into the CodePilot media library. Use this when the user asks to save a generated or downloaded media file to the library. The file must exist on disk. Always fill in prompt, model, resolution, and source when available.',
+        'Import a local file (image, video, audio) into the 德劳克 media library. Use this when the user asks to save a generated or downloaded media file to the library. The file must exist on disk. Always fill in prompt, model, resolution, and source when available.',
         {
           filePath: z.string().describe('Absolute or relative path to the media file on disk'),
           title: z.string().optional().describe('Display title for the media in the library'),

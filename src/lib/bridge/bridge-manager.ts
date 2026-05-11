@@ -926,7 +926,7 @@ async function handleCommand(
   switch (command) {
     case '/start':
       response = [
-        '<b>CodePilot Bridge</b>',
+        '<b>德劳克 Bridge</b>',
         '',
         'Send any message to interact with Claude.',
         'Type /help for available commands.',
@@ -1218,7 +1218,7 @@ async function handleCommand(
           const plugin = adapter.getPlugin();
           const config = (plugin as FeishuChannelPlugin).getConfig?.();
           if (!config) {
-            response = '❌ Feishu plugin not configured.\n\nPlease set App ID and App Secret in CodePilot settings, or use /feishu auth.';
+            response = '❌ Feishu plugin not configured.\n\nPlease set App ID and App Secret in 德劳克 settings, or use /feishu auth.';
             break;
           }
           const validationError = plugin.validateConfig();
@@ -1248,7 +1248,7 @@ async function handleCommand(
           const plugin = adapter.getPlugin();
           const config = (plugin as FeishuChannelPlugin).getConfig?.();
           if (!config) {
-            response = '❌ App credentials not configured.\n\nPlease configure App ID and App Secret in CodePilot Settings → Bridge → Feishu.';
+            response = '❌ App credentials not configured.\n\nPlease configure App ID and App Secret in 德劳克 Settings → Bridge → Feishu.';
             break;
           }
           // Note: CodePilot currently uses app-level bot tokens (no user OAuth)
@@ -1260,7 +1260,7 @@ async function handleCommand(
             `DM Policy: ${config.dmPolicy}`,
             `Allow From: ${(config.allowFrom || []).join(', ') || '(all)'}`,
             '',
-            'ℹ️ CodePilot uses app-level bot tokens.',
+            'ℹ️ 德劳克 uses app-level bot tokens.',
             'User-level OAuth (user_access_token) is not yet supported.',
             'Some features requiring user identity (cross-chat search, sending as user) are unavailable.',
           ].join('\n');
@@ -1306,7 +1306,7 @@ async function handleCommand(
 
           // Known limitations
           lines.push('');
-          lines.push('Known Limitations (CodePilot vs OpenClaw):');
+          lines.push('Known Limitations (德劳克 vs OpenClaw):');
           lines.push('   • No user_access_token / OAuth Device Flow');
           lines.push('   • No cross-chat search (search.message.create requires UAT)');
           lines.push('   • No "send as user" capability');
@@ -1334,7 +1334,7 @@ async function handleCommand(
 
     case '/help':
       response = [
-        '<b>CodePilot Bridge Commands</b>',
+        '<b>德劳克 Bridge Commands</b>',
         '',
         '<b>Session:</b>',
         '/new [path] - Create new session (optional: specify CWD)',

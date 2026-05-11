@@ -235,7 +235,7 @@ export async function notifyPermissionRequest(
     `Tool: <code>${escapeHtml(toolName)}</code>`,
     `<pre>${escapeHtml(truncatedInput)}</pre>`,
     ``,
-    `⚠️ Please approve or deny in CodePilot.`,
+    `⚠️ Please approve or deny in 德劳克.`,
   ].filter(Boolean).join('\n');
 
   const result = await sendMessage(msg);
@@ -292,7 +292,7 @@ export async function verifyBot(
     if (chatId) {
       const testResult = await callTelegramApi(botToken, 'sendMessage', {
         chat_id: chatId,
-        text: `✅ CodePilot connected successfully!\n\nBot: @${botName}\nNotifications will be sent to this chat.`,
+        text: `✅ 德劳克 connected successfully!\n\nBot: @${botName}\nNotifications will be sent to this chat.`,
         parse_mode: 'HTML',
       });
       if (!testResult.ok) {
@@ -368,7 +368,7 @@ export function buildStatusMessage(): string {
   const recentSessions = allSessions.slice(0, 5);
 
   const lines: string[] = [
-    `📊 <b>CodePilot Status</b>`,
+    `📊 <b>德劳克 Status</b>`,
     ``,
   ];
 
@@ -533,9 +533,9 @@ async function pollLoop(botToken: string, chatId: string, state: PollerState): P
           await callTelegramApi(botToken, 'sendMessage', {
             chat_id: chatId,
             text: [
-              `👋 <b>CodePilot Bot</b>`,
+              `👋 <b>德劳克 Bot</b>`,
               ``,
-              `I'll send you notifications about your CodePilot tasks.`,
+              `I'll send you notifications about your 德劳克 tasks.`,
               ``,
               `<b>Commands:</b>`,
               `/status — Show current task status`,
@@ -555,7 +555,7 @@ async function pollLoop(botToken: string, chatId: string, state: PollerState): P
           await callTelegramApi(botToken, 'sendMessage', {
             chat_id: chatId,
             text: [
-              `<b>CodePilot Bot Commands</b>`,
+              `<b>德劳克 Bot Commands</b>`,
               ``,
               `/status — Show current task status`,
               `/help — Show this help message`,

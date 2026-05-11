@@ -325,7 +325,7 @@ function successHtml(): string {
 <style>body{font-family:system-ui;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#fafafa;}
 .card{text-align:center;padding:2rem;border-radius:12px;background:#fff;box-shadow:0 2px 8px rgba(0,0,0,0.1);}
 h1{color:#10b981;font-size:1.5rem;}p{color:#6b7280;}</style></head>
-<body><div class="card"><h1>✓ Login Successful</h1><p>You can close this tab and return to CodePilot.</p></div>
+<body><div class="card"><h1>✓ Login Successful</h1><p>You can close this tab and return to 德劳克.</p></div>
 <script>setTimeout(()=>window.close(),2000)</script></body></html>`;
 }
 

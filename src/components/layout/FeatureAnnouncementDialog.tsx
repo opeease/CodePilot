@@ -73,14 +73,14 @@ export function FeatureAnnouncementDialog() {
         <div className="space-y-3 text-sm">
           <div className="rounded-md bg-amber-500/10 border border-amber-500/20 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">
             {isZh
-              ? <>如遇问题请到 <a href="https://github.com/op7418/CodePilot/issues" target="_blank" rel="noopener noreferrer" className="underline font-medium">GitHub Issues</a> 反馈。</>
-              : <>Report issues on <a href="https://github.com/op7418/CodePilot/issues" target="_blank" rel="noopener noreferrer" className="underline font-medium">GitHub Issues</a>.</>
+              ? <>如遇问题请到 <a href="https://github.com/op7418/德劳克 ??/issues" target="_blank" rel="noopener noreferrer" className="underline font-medium">GitHub Issues</a> 反馈。</>
+              : <>Report issues on <a href="https://github.com/op7418/德劳克 ??/issues" target="_blank" rel="noopener noreferrer" className="underline font-medium">GitHub Issues</a>.</>
             }
           </div>
 
           {isZh ? (
             <>
-              <p>CodePilot 现在可以脱离 Claude Code CLI 独立运行了。</p>
+              <p>德劳克 ?? 现在可以脱离 Claude Code CLI 独立运行了。</p>
               <div className="space-y-2 text-muted-foreground">
                 <p><span className="text-foreground font-medium">AI SDK 引擎</span> — 无需安装 CLI，支持所有已配置的服务商</p>
                 <p><span className="text-foreground font-medium">Claude Code 引擎</span> — 通过 CLI 驱动，获得完整的命令行能力</p>
@@ -89,7 +89,7 @@ export function FeatureAnnouncementDialog() {
             </>
           ) : (
             <>
-              <p>CodePilot can now run independently without the Claude Code CLI.</p>
+              <p>德劳克 ?? can now run independently without the Claude Code CLI.</p>
               <div className="space-y-2 text-muted-foreground">
                 <p><span className="text-foreground font-medium">AI SDK engine</span> — no CLI needed, works with all configured providers</p>
                 <p><span className="text-foreground font-medium">Claude Code engine</span> — driven by CLI for full command-line capabilities</p>

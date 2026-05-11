@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
     if (!hasCodePilotProvider()) {
       return new Response(
         JSON.stringify({
-          error: 'No provider configured in CodePilot.',
+          error: 'No provider configured in 德劳克.',
           code: 'NEEDS_PROVIDER_SETUP',
           actionHint: 'open_setup_center',
           initialCard: 'provider',
