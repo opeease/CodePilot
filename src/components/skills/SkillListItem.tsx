@@ -14,10 +14,17 @@ import { useTranslation } from "@/hooks/useTranslation";
 export interface SkillItem {
   name: string;
   description: string;
+  descriptionZh?: string;
+  descriptionEn?: string;
   content: string;
   source: "global" | "project" | "plugin" | "installed";
   installedSource?: "agents" | "claude";
   filePath: string;
+}
+
+export function getLocalizedSkillDescription(skill: SkillItem, isZh: boolean): string {
+  if (isZh) return skill.descriptionZh || skill.description || skill.descriptionEn || "";
+  return skill.descriptionEn || skill.description || skill.descriptionZh || "";
 }
 
 interface SkillListItemProps {
@@ -34,8 +41,10 @@ export function SkillListItem({
   onDelete,
 }: SkillListItemProps) {
   const { t } = useTranslation();
+  const isZh = t('nav.chats') === '对话';
   const [hovered, setHovered] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const description = getLocalizedSkillDescription(skill, isZh);
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -68,7 +77,7 @@ export function SkillListItem({
       <div className="flex-1 min-w-0">
         <span className="text-sm font-medium truncate block">/{skill.name}</span>
         <p className="text-xs text-muted-foreground truncate">
-          {skill.description}
+          {description}
         </p>
       </div>
       {(hovered || confirmDelete) && (

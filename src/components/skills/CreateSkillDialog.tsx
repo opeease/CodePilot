@@ -26,7 +26,13 @@ const TEMPLATES: { label: string; content: string }[] = [
   { label: "Blank", content: "" },
   {
     label: "Commit Helper",
-    content: `# Commit Helper
+    content: `---
+description:
+  zh: 检查暂存改动并生成符合规范的提交信息。
+  en: Review staged changes and generate a conventional commit message.
+---
+
+# Commit Helper
 
 Review the staged changes and generate a concise, descriptive commit message following conventional commit format.
 
@@ -39,7 +45,13 @@ Rules:
   },
   {
     label: "Code Reviewer",
-    content: `# Code Reviewer
+    content: `---
+description:
+  zh: 审查代码的正确性、性能、可读性和安全风险。
+  en: Review code for correctness, performance, readability, and security risks.
+---
+
+# Code Reviewer
 
 Review the provided code and give feedback on:
 

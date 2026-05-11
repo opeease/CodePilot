@@ -117,7 +117,7 @@ export function UnifiedTopBar() {
     // Thin drag region for macOS window dragging — just enough for traffic light area
     return (
       <div
-        className="h-3 shrink-0"
+        className={`${isWindows ? 'h-10' : 'h-3'} shrink-0`}
         style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
       />
     );

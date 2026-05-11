@@ -148,6 +148,60 @@ function normaliseBaseUrl(url: string | undefined): string | undefined {
   return `${cleaned}/v1`;
 }
 
+function needsDeepSeekReasoningReplayCompat(config: AiSdkConfig): boolean {
+  const baseUrl = (config.baseUrl || '').toLowerCase();
+  const modelId = config.modelId.toLowerCase();
+  return (
+    baseUrl.includes('api.opeease.com') ||
+    baseUrl.includes('server.opeease.com') ||
+    (
+      baseUrl.endsWith('/v1') &&
+      (
+        modelId.startsWith('deepseek-v4-') ||
+        modelId === 'deepseek-chat' ||
+        modelId === 'deepseek-reasoner'
+      )
+    )
+  );
+}
+
+function createOpenAICompatibleFetch(config: AiSdkConfig): ((url: RequestInfo | URL, init?: RequestInit) => Promise<Response>) | undefined {
+  if (!needsDeepSeekReasoningReplayCompat(config)) return undefined;
+
+  return async (url: RequestInfo | URL, init?: RequestInit) => {
+    let nextInit = init;
+
+    try {
+      const reqUrl = url instanceof URL ? url : new URL(String(url));
+      const body = typeof init?.body === 'string' ? init.body : undefined;
+
+      if (body && reqUrl.pathname.endsWith('/chat/completions')) {
+        const parsed = JSON.parse(body) as {
+          messages?: Array<Record<string, unknown>>;
+        };
+
+        if (Array.isArray(parsed.messages)) {
+          parsed.messages = parsed.messages.map((message) => {
+            if (
+              message &&
+              message.role === 'assistant' &&
+              message.reasoning_content === undefined
+            ) {
+              return { ...message, reasoning_content: '' };
+            }
+            return message;
+          });
+          nextInit = { ...init, body: JSON.stringify(parsed) };
+        }
+      }
+    } catch {
+      // Leave the SDK request untouched if the body is not the expected JSON shape.
+    }
+
+    return fetch(url, nextInit);
+  };
+}
+
 // ── Provider creation ───────────────────────────────────────────
 
 // Beta headers matching OpenCode's anthropic custom loader.
@@ -253,12 +307,14 @@ function createLanguageModel(config: AiSdkConfig, isThirdPartyProxy: boolean): L
         return openai.responses(config.modelId);
       }
 
+      const compatibilityFetch = createOpenAICompatibleFetch(config);
       const openai = createOpenAI({
         apiKey: config.apiKey,
         baseURL: config.baseUrl,
         ...(hasHeaders ? { headers: config.headers } : {}),
+        ...(compatibilityFetch ? { fetch: compatibilityFetch } : {}),
       });
-      return openai(config.modelId);
+      return openai.chat(config.modelId);
     }
 
     case 'google': {

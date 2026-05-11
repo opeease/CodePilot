@@ -44,6 +44,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
+const NEW_API_BASE_URL = "https://api.opeease.com";
+
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
@@ -75,7 +77,7 @@ export function ProviderManager() {
   const [openaiError, setOpenaiError] = useState<string | null>(null);
 
   // New API account binding
-  const [newApiBaseUrl, setNewApiBaseUrl] = useState('https://server.opeease.com:3000');
+  const [newApiBaseUrl, setNewApiBaseUrl] = useState(NEW_API_BASE_URL);
   const [newApiUsername, setNewApiUsername] = useState('');
   const [newApiPassword, setNewApiPassword] = useState('');
   const [newApiBinding, setNewApiBinding] = useState(false);
@@ -610,11 +612,11 @@ export function ProviderManager() {
                       : 'Sign in with a New API account to create an API key and bind it as the default provider.'}
                   </p>
                 </div>
-                <div className="grid gap-2 sm:grid-cols-[1.2fr_0.8fr_0.8fr_auto]">
+                <div className="grid gap-2 sm:grid-cols-[1.2fr_0.8fr_0.8fr_auto_auto]">
                   <Input
                     value={newApiBaseUrl}
                     onChange={(event) => setNewApiBaseUrl(event.target.value)}
-                    placeholder="https://server.opeease.com:3000"
+                    placeholder={NEW_API_BASE_URL}
                     className="h-8 text-xs"
                   />
                   <Input
@@ -642,6 +644,14 @@ export function ProviderManager() {
                   >
                     {newApiBinding && <SpinnerGap size={12} className="animate-spin" />}
                     {isZh ? '登录绑定' : 'Bind'}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="h-8 text-xs"
+                    onClick={() => window.open(NEW_API_BASE_URL, '_blank', 'noopener,noreferrer')}
+                  >
+                    {isZh ? '充值' : 'Recharge'}
                   </Button>
                 </div>
                 {newApiMessage && (

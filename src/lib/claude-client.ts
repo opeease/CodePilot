@@ -21,7 +21,7 @@ import { captureCapabilities, isCacheFresh, setCachedPlugins } from './agent-sdk
 import { normalizeMessageContent, microCompactMessage } from './message-normalizer';
 import { roughTokenEstimate } from './context-estimator';
 import { getSetting, updateSdkSessionId, createPermissionRequest } from './db';
-import { resolveForClaudeCode } from './provider-resolver';
+import { resolveForClaudeCode, resolveProvider } from './provider-resolver';
 import { sanitizeClaudeModelOptions } from './claude-model-options';
 import { findClaudeBinary, invalidateClaudePathCache } from './platform';
 import { notifyPermissionRequest, notifyGeneric } from './telegram-bot';
@@ -437,9 +437,23 @@ export function streamClaude(options: ClaudeStreamOptions): ReadableStream<strin
   const effectiveProvider = options.providerId || options.sessionProviderId || '';
   let runtime;
 
-  // Non-Anthropic providers (OpenAI OAuth, etc.) MUST use Native Runtime
-  // because Claude Code SDK only supports Anthropic models.
-  const isNonAnthropicProvider = effectiveProvider === 'openai-oauth';
+  // Non-Anthropic providers (OpenAI OAuth, New API, OpenRouter, Gemini, etc.)
+  // must use Native Runtime because Claude Code SDK cannot speak those wire
+  // protocols. Without this, auto mode can select the CLI runtime and make
+  // OpenAI-compatible models look selectable but inert.
+  const isNonAnthropicProvider = (() => {
+    if (effectiveProvider === 'openai-oauth') return true;
+    try {
+      const resolved = resolveProvider({
+        providerId: options.providerId,
+        sessionProviderId: options.sessionProviderId,
+        model: options.model,
+      });
+      return resolved.protocol !== 'anthropic' && resolved.protocol !== 'bedrock' && resolved.protocol !== 'vertex';
+    } catch {
+      return false;
+    }
+  })();
 
   if (isNonAnthropicProvider) {
     runtime = getRuntime('native');

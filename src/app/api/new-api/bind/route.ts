@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { bindNewApiAccount, getNewApiLoginStatus } from '@/lib/new-api-client';
+import { getModelsForProvider } from '@/lib/db';
 import type { ErrorResponse } from '@/types';
 
 function maskProvider<T extends { api_key?: string }>(provider: T): T {
@@ -10,8 +11,13 @@ function maskProvider<T extends { api_key?: string }>(provider: T): T {
 
 export async function GET() {
   const status = getNewApiLoginStatus();
+  const models = status.provider
+    ? getModelsForProvider(status.provider.id).map((model) => model.model_id)
+    : [];
   return NextResponse.json({
     ...status,
+    models,
+    groups: status.groups || [],
     provider: status.provider ? maskProvider(status.provider) : undefined,
   });
 }
@@ -28,6 +34,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       provider: maskProvider(result.provider),
       models: result.models,
+      groups: result.groups,
       username: result.username,
       loggedIn: true,
     });

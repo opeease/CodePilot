@@ -13,13 +13,14 @@ import { MarketplaceBrowser } from "./MarketplaceBrowser";
 import { useTranslation } from "@/hooks/useTranslation";
 import type { TranslationKey } from "@/i18n";
 import { cn } from "@/lib/utils";
-import type { SkillItem } from "./SkillListItem";
+import { getLocalizedSkillDescription, type SkillItem } from "./SkillListItem";
 
 type ViewTab = "local" | "marketplace";
 
 export function SkillsManager() {
   const { workingDirectory } = usePanel();
   const { t } = useTranslation();
+  const isZh = t('nav.chats') === '对话';
   const [skills, setSkills] = useState<SkillItem[]>([]);
   const [selected, setSelected] = useState<SkillItem | null>(null);
   const [loading, setLoading] = useState(true);
@@ -131,9 +132,16 @@ export function SkillsManager() {
   );
 
   const filtered = skills.filter(
-    (s) =>
-      s.name.toLowerCase().includes(search.toLowerCase()) ||
-      s.description.toLowerCase().includes(search.toLowerCase())
+    (s) => {
+      const q = search.toLowerCase();
+      const descriptions = [
+        getLocalizedSkillDescription(s, isZh),
+        s.description,
+        s.descriptionZh,
+        s.descriptionEn,
+      ].filter(Boolean).join(" ").toLowerCase();
+      return s.name.toLowerCase().includes(q) || descriptions.includes(q);
+    }
   );
 
   const globalSkills = filtered.filter((s) => s.source === "global");

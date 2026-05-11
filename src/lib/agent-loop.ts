@@ -76,6 +76,27 @@ const DEFAULT_MAX_STEPS = 50;
 const DOOM_LOOP_THRESHOLD = 3; // same tool called 3 times in a row
 const KEEPALIVE_INTERVAL_MS = 15_000;
 
+function formatNativeStreamError(error: unknown, modelId: string): { category: string; userMessage: string; details?: string; actionHint?: string } {
+  const message = error instanceof Error ? error.message : String(error);
+
+  if (/No available channel for model\s+([^\s]+)\s+under group\s+([^\s]+)/i.test(message)) {
+    const match = message.match(/No available channel for model\s+([^\s]+)\s+under group\s+([^\s]+)/i);
+    const model = match?.[1] || modelId;
+    const group = match?.[2] || "default";
+    return {
+      category: "NEW_API_CHANNEL_UNAVAILABLE",
+      userMessage: `New API 后台没有可用的 ${model} 渠道。`,
+      actionHint: `请在 New API 管理后台检查模型 ${model} 的渠道是否启用、渠道分组是否包含 ${group}、当前用户/令牌是否属于 ${group} 分组，并确认上游 API Key 有余额且测试通过。`,
+      details: message,
+    };
+  }
+
+  return {
+    category: "NATIVE_STREAM_ERROR",
+    userMessage: message,
+  };
+}
+
 // ── Main ────────────────────────────────────────────────────────
 
 /**
@@ -425,6 +446,7 @@ export function runAgentLoop(options: AgentLoopOptions): ReadableStream<string> 
           // Consume the fullStream
           let hasToolCalls = false;
           let hasContent = false; // tracks whether any actual content was produced
+          let hasStreamError = false;
           const stepToolNames: string[] = [];
 
           for await (const event of result.fullStream) {
@@ -465,9 +487,10 @@ export function runAgentLoop(options: AgentLoopOptions): ReadableStream<string> 
                 break;
 
               case 'error':
+                hasStreamError = true;
                 controller.enqueue(formatSSE({
                   type: 'error',
-                  data: typeof event.error === 'string' ? event.error : JSON.stringify({ userMessage: String(event.error) }),
+                  data: JSON.stringify(formatNativeStreamError(event.error, modelId)),
                 }));
                 break;
 
@@ -482,7 +505,7 @@ export function runAgentLoop(options: AgentLoopOptions): ReadableStream<string> 
           // If no tool calls, the model is done
           if (!hasToolCalls) {
             // Detect truly empty response (no text, no thinking, no tools)
-            if (!hasContent) {
+            if (!hasContent && !hasStreamError) {
               const finishReason = await result.finishReason;
               console.error(`[agent-loop] Empty response: finishReason=${finishReason}, model=${modelId}`);
               reportNativeError('EMPTY_RESPONSE', new Error(`Empty response: finishReason=${finishReason}`), { modelId, sessionId });

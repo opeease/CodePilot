@@ -17,6 +17,7 @@
 
 import type { AgentRuntime } from './types';
 import { getSetting } from '@/lib/db';
+import { resolveProvider } from '@/lib/provider-resolver';
 
 const runtimes = new Map<string, AgentRuntime>();
 
@@ -96,6 +97,16 @@ export function resolveRuntime(overrideId?: string, _providerId?: string): Agent
 export function predictNativeRuntime(providerId?: string): boolean {
   // Non-Anthropic providers always force native
   if (providerId === 'openai-oauth') return true;
+  if (providerId) {
+    try {
+      const resolved = resolveProvider({ providerId });
+      if (resolved.protocol !== 'anthropic' && resolved.protocol !== 'bedrock' && resolved.protocol !== 'vertex') {
+        return true;
+      }
+    } catch {
+      // Fall through to generic runtime prediction.
+    }
+  }
 
   // cli_enabled=false → always native
   if (getSetting('cli_enabled') === 'false') return true;

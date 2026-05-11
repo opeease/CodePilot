@@ -8,6 +8,8 @@ import type { SkillKind } from "@/types";
 interface SkillFile {
   name: string;
   description: string;
+  descriptionZh?: string;
+  descriptionEn?: string;
   content: string;
   source: "global" | "project" | "plugin" | "installed" | "sdk";
   kind: SkillKind;
@@ -105,6 +107,8 @@ function scanProjectSkills(dir: string): SkillFile[] {
       skills.push({
         name,
         description,
+        descriptionZh: meta.descriptionZh,
+        descriptionEn: meta.descriptionEn,
         content,
         source: "project",
         kind: "agent_skill",
@@ -123,16 +127,20 @@ function computeContentHash(content: string): string {
 
 /**
  * Parse YAML front matter from SKILL.md content.
- * Extracts `name` and `description` fields from the --- delimited block.
+ * Extracts `name` and bilingual description fields from the --- delimited block.
  */
-function parseSkillFrontMatter(content: string): { name?: string; description?: string } {
+function cleanYamlValue(value: string): string {
+  return value.trim().replace(/^['"]|['"]$/g, "");
+}
+
+function parseSkillFrontMatter(content: string): { name?: string; description?: string; descriptionZh?: string; descriptionEn?: string } {
   // Extract front matter between --- delimiters
   const fmMatch = content.match(/^---\r?\n([\s\S]+?)\r?\n---/);
   if (!fmMatch) return {};
 
   const frontMatter = fmMatch[1];
   const lines = frontMatter.split(/\r?\n/);
-  const result: { name?: string; description?: string } = {};
+  const result: { name?: string; description?: string; descriptionZh?: string; descriptionEn?: string } = {};
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -140,7 +148,34 @@ function parseSkillFrontMatter(content: string): { name?: string; description?: 
     // Match name: value
     const nameMatch = line.match(/^name:\s*(.+)/);
     if (nameMatch) {
-      result.name = nameMatch[1].trim();
+      result.name = cleanYamlValue(nameMatch[1]);
+      continue;
+    }
+
+    const descZhMatch = line.match(/^description_(?:zh|cn):\s+(.+)/i) || line.match(/^descriptionZh:\s+(.+)/);
+    if (descZhMatch) {
+      result.descriptionZh = cleanYamlValue(descZhMatch[1]);
+      continue;
+    }
+
+    const descEnMatch = line.match(/^description_en:\s+(.+)/i) || line.match(/^descriptionEn:\s+(.+)/);
+    if (descEnMatch) {
+      result.descriptionEn = cleanYamlValue(descEnMatch[1]);
+      continue;
+    }
+
+    if (/^description:\s*$/.test(line)) {
+      for (let j = i + 1; j < lines.length; j++) {
+        if (!/^\s+/.test(lines[j])) break;
+        const nested = lines[j].trim();
+        const zhMatch = nested.match(/^(?:zh|cn):\s+(.+)/i);
+        if (zhMatch) result.descriptionZh = cleanYamlValue(zhMatch[1]);
+        const enMatch = nested.match(/^en:\s+(.+)/i);
+        if (enMatch) result.descriptionEn = cleanYamlValue(enMatch[1]);
+      }
+      if (!result.description && (result.descriptionEn || result.descriptionZh)) {
+        result.description = result.descriptionEn || result.descriptionZh;
+      }
       continue;
     }
 
@@ -163,9 +198,10 @@ function parseSkillFrontMatter(content: string): { name?: string; description?: 
     // Match description: value (single-line)
     const descMatch = line.match(/^description:\s+(.+)/);
     if (descMatch) {
-      result.description = descMatch[1].trim();
+      result.description = cleanYamlValue(descMatch[1]);
     }
   }
+  if (!result.description) result.description = result.descriptionEn || result.descriptionZh;
   return result;
 }
 
@@ -197,6 +233,8 @@ function scanInstalledSkills(
       skills.push({
         name,
         description,
+        descriptionZh: meta.descriptionZh,
+        descriptionEn: meta.descriptionEn,
         content,
         source: "installed",
         kind: "agent_skill",
@@ -275,11 +313,22 @@ function scanDirectory(
       const name = prefix ? `${prefix}:${baseName}` : baseName;
       const filePath = fullPath;
       const content = fs.readFileSync(filePath, "utf-8");
-      const firstLine = content.split("\n")[0]?.trim() || "";
-      const description = firstLine.startsWith("#")
+      const meta = parseSkillFrontMatter(content);
+      const contentWithoutFrontMatter = content.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, "");
+      const firstLine = contentWithoutFrontMatter.split("\n")[0]?.trim() || "";
+      const description = meta.description || (firstLine.startsWith("#")
         ? firstLine.replace(/^#+\s*/, "")
-        : firstLine || `Skill: /${name}`;
-      skills.push({ name, description, content, source, kind: "slash_command", filePath });
+        : firstLine || `Skill: /${name}`);
+      skills.push({
+        name: meta.name || name,
+        description,
+        descriptionZh: meta.descriptionZh,
+        descriptionEn: meta.descriptionEn,
+        content,
+        source,
+        kind: "slash_command",
+        filePath,
+      });
     }
   } catch {
     // ignore read errors

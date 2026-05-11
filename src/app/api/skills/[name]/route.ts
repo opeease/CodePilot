@@ -39,22 +39,53 @@ function computeContentHash(content: string): string {
 
 /**
  * Parse YAML front matter from SKILL.md content.
- * Extracts `name` and `description` fields from the --- delimited block.
+ * Extracts `name` and bilingual description fields from the --- delimited block.
  */
-function parseSkillFrontMatter(content: string): { name?: string; description?: string } {
+function cleanYamlValue(value: string): string {
+  return value.trim().replace(/^['"]|['"]$/g, "");
+}
+
+function parseSkillFrontMatter(content: string): { name?: string; description?: string; descriptionZh?: string; descriptionEn?: string } {
   const fmMatch = content.match(/^---\r?\n([\s\S]+?)\r?\n---/);
   if (!fmMatch) return {};
 
   const frontMatter = fmMatch[1];
   const lines = frontMatter.split(/\r?\n/);
-  const result: { name?: string; description?: string } = {};
+  const result: { name?: string; description?: string; descriptionZh?: string; descriptionEn?: string } = {};
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
     const nameMatch = line.match(/^name:\s*(.+)/);
     if (nameMatch) {
-      result.name = nameMatch[1].trim();
+      result.name = cleanYamlValue(nameMatch[1]);
+      continue;
+    }
+
+    const descZhMatch = line.match(/^description_(?:zh|cn):\s+(.+)/i) || line.match(/^descriptionZh:\s+(.+)/);
+    if (descZhMatch) {
+      result.descriptionZh = cleanYamlValue(descZhMatch[1]);
+      continue;
+    }
+
+    const descEnMatch = line.match(/^description_en:\s+(.+)/i) || line.match(/^descriptionEn:\s+(.+)/);
+    if (descEnMatch) {
+      result.descriptionEn = cleanYamlValue(descEnMatch[1]);
+      continue;
+    }
+
+    if (/^description:\s*$/.test(line)) {
+      for (let j = i + 1; j < lines.length; j++) {
+        if (!/^\s+/.test(lines[j])) break;
+        const nested = lines[j].trim();
+        const zhMatch = nested.match(/^(?:zh|cn):\s+(.+)/i);
+        if (zhMatch) result.descriptionZh = cleanYamlValue(zhMatch[1]);
+        const enMatch = nested.match(/^en:\s+(.+)/i);
+        if (enMatch) result.descriptionEn = cleanYamlValue(enMatch[1]);
+      }
+      if (!result.description && (result.descriptionEn || result.descriptionZh)) {
+        result.description = result.descriptionEn || result.descriptionZh;
+      }
       continue;
     }
 
@@ -75,9 +106,10 @@ function parseSkillFrontMatter(content: string): { name?: string; description?: 
 
     const descMatch = line.match(/^description:\s+(.+)/);
     if (descMatch) {
-      result.description = descMatch[1].trim();
+      result.description = cleanYamlValue(descMatch[1]);
     }
   }
+  if (!result.description) result.description = result.descriptionEn || result.descriptionZh;
   return result;
 }
 
@@ -270,16 +302,23 @@ export async function GET(
     }
 
     const content = fs.readFileSync(found.filePath, "utf-8");
-    const firstLine = content.split("\n")[0]?.trim() || "";
+    const meta = parseSkillFrontMatter(content);
+    const contentWithoutFrontMatter = content.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, "");
+    const firstLine = contentWithoutFrontMatter.split("\n")[0]?.trim() || "";
     let description: string;
+    let descriptionZh: string | undefined;
+    let descriptionEn: string | undefined;
 
     if (found.filePath.endsWith("SKILL.md")) {
-      const meta = parseSkillFrontMatter(content);
       description = meta.description || (firstLine.startsWith("#") ? firstLine.replace(/^#+\s*/, "") : firstLine || `Skill: /${name}`);
+      descriptionZh = meta.descriptionZh;
+      descriptionEn = meta.descriptionEn;
     } else {
-      description = firstLine.startsWith("#")
+      description = meta.description || (firstLine.startsWith("#")
         ? firstLine.replace(/^#+\s*/, "")
-        : firstLine || `Skill: /${name}`;
+        : firstLine || `Skill: /${name}`);
+      descriptionZh = meta.descriptionZh;
+      descriptionEn = meta.descriptionEn;
     }
 
     const kind: SkillKind = found.filePath.endsWith("SKILL.md") ? "agent_skill" : "slash_command";
@@ -288,6 +327,8 @@ export async function GET(
       skill: {
         name,
         description,
+        descriptionZh,
+        descriptionEn,
         content,
         source: found.source,
         installedSource: found.installedSource,
@@ -341,10 +382,13 @@ export async function PUT(
 
     fs.writeFileSync(found.filePath, content ?? "", "utf-8");
 
-    const firstLine = (content ?? "").split("\n")[0]?.trim() || "";
-    const description = firstLine.startsWith("#")
+    const nextContent = content ?? "";
+    const meta = parseSkillFrontMatter(nextContent);
+    const contentWithoutFrontMatter = nextContent.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, "");
+    const firstLine = contentWithoutFrontMatter.split("\n")[0]?.trim() || "";
+    const description = meta.description || (firstLine.startsWith("#")
       ? firstLine.replace(/^#+\s*/, "")
-      : firstLine || `Skill: /${name}`;
+      : firstLine || `Skill: /${name}`);
 
     const kind: SkillKind = found.filePath.endsWith("SKILL.md") ? "agent_skill" : "slash_command";
 
@@ -352,7 +396,9 @@ export async function PUT(
       skill: {
         name,
         description,
-        content: content ?? "",
+        descriptionZh: meta.descriptionZh,
+        descriptionEn: meta.descriptionEn,
+        content: nextContent,
         source: found.source,
         installedSource: found.installedSource,
         filePath: found.filePath,

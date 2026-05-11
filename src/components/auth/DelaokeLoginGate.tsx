@@ -7,7 +7,7 @@ import { CodePilotLogo } from "@/components/chat/CodePilotLogo";
 import { SpinnerGap } from "@/components/ui/icon";
 
 const SESSION_KEY = "delaoke:new-api:session";
-const DEFAULT_BASE_URL = "https://server.opeease.com:3000";
+const DEFAULT_BASE_URL = "https://api.opeease.com";
 
 interface LoginSession {
   username: string;
@@ -17,6 +17,9 @@ interface LoginSession {
 }
 
 type AuthMode = "login" | "register";
+
+const dragRegionStyle = { WebkitAppRegion: "drag" } as React.CSSProperties;
+const noDragRegionStyle = { WebkitAppRegion: "no-drag" } as React.CSSProperties;
 
 function readStoredSession(): LoginSession | null {
   if (typeof window === "undefined") return null;
@@ -37,9 +40,16 @@ function readStoredSession(): LoginSession | null {
   }
 }
 
+function uniqueModels(models: unknown): string[] {
+  if (!Array.isArray(models)) return [];
+  return Array.from(new Set(models.filter((item): item is string => typeof item === "string" && item.trim().length > 0).map((item) => item.trim())));
+}
+
 export function DelaokeLoginGate({ children }: { children: React.ReactNode }) {
   const [checking, setChecking] = useState(true);
   const [loggedIn, setLoggedIn] = useState(false);
+  const [showModelSummary, setShowModelSummary] = useState(false);
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [mode, setMode] = useState<AuthMode>("login");
   const [baseUrl, setBaseUrl] = useState(DEFAULT_BASE_URL);
   const [username, setUsername] = useState("");
@@ -60,10 +70,21 @@ export function DelaokeLoginGate({ children }: { children: React.ReactNode }) {
       .then((data) => {
         if (cancelled) return;
         if (data?.baseUrl) setBaseUrl(data.baseUrl);
-        if (stored && data?.loggedIn) {
-          setLoggedIn(true);
-        } else if (data?.username) {
-          setUsername(data.username);
+        if (data?.username) setUsername(data.username);
+
+        if (data?.loggedIn) {
+          const models = uniqueModels(data.models);
+          setAvailableModels(models);
+          localStorage.setItem(SESSION_KEY, JSON.stringify({
+            username: data.username || stored?.username || "",
+            baseUrl: data.baseUrl || stored?.baseUrl || DEFAULT_BASE_URL,
+            providerId: data.provider?.id || stored?.providerId,
+            loggedInAt: stored?.loggedInAt || new Date().toISOString(),
+          }));
+          setShowModelSummary(true);
+        } else if (stored) {
+          setUsername(stored.username);
+          setBaseUrl(stored.baseUrl);
         }
       })
       .catch(() => {
@@ -78,17 +99,23 @@ export function DelaokeLoginGate({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const completeLogin = (data: { username?: string; provider?: { id?: string } }) => {
+  const completeLogin = (data: { username?: string; baseUrl?: string; models?: unknown; provider?: { id?: string } }) => {
     localStorage.setItem(SESSION_KEY, JSON.stringify({
       username: data.username || username,
-      baseUrl,
+      baseUrl: data.baseUrl || baseUrl,
       providerId: data.provider?.id,
       loggedInAt: new Date().toISOString(),
     }));
+    setAvailableModels(uniqueModels(data.models));
     setPassword("");
     setConfirmPassword("");
-    setLoggedIn(true);
+    setShowModelSummary(true);
     window.dispatchEvent(new Event("provider-changed"));
+  };
+
+  const enterApp = () => {
+    setShowModelSummary(false);
+    setLoggedIn(true);
   };
 
   const handleSubmit = async (event: FormEvent) => {
@@ -129,19 +156,60 @@ export function DelaokeLoginGate({ children }: { children: React.ReactNode }) {
 
   if (checking) {
     return (
-      <div className="flex h-screen items-center justify-center bg-background">
-        <SpinnerGap size={24} className="animate-spin text-muted-foreground" />
+      <div className="flex h-screen items-center justify-center bg-background" style={dragRegionStyle}>
+        <SpinnerGap size={24} className="animate-spin text-muted-foreground" style={noDragRegionStyle} />
       </div>
     );
   }
 
   if (loggedIn) return <>{children}</>;
 
+  if (showModelSummary) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background px-6 text-foreground" style={dragRegionStyle}>
+        <div className="w-full max-w-md space-y-5" style={noDragRegionStyle}>
+          <div className="space-y-2">
+            <CodePilotLogo className="h-14 w-14" />
+            <h2 className="text-2xl font-semibold tracking-normal">德劳克账号已登录</h2>
+            <p className="text-sm leading-6 text-muted-foreground">
+              当前账号可以在德劳克里选择下面这些模型。
+            </p>
+          </div>
+
+          <div className="rounded-md border border-border bg-muted/30">
+            <div className="border-b border-border px-3 py-2 text-sm font-medium">
+              可用模型（{availableModels.length}）
+            </div>
+            <div className="max-h-64 overflow-y-auto p-2">
+              {availableModels.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {availableModels.map((model) => (
+                    <span key={model} className="rounded-md border border-border bg-background px-2 py-1 text-xs font-mono">
+                      {model}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="px-1 py-3 text-sm text-muted-foreground">
+                  暂未读取到模型。请在 New API 后台确认渠道和模型已启用。
+                </p>
+              )}
+            </div>
+          </div>
+
+          <Button className="w-full" onClick={enterApp}>
+            进入德劳克
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   const isRegister = mode === "register";
-  const submitDisabled = submitting || !baseUrl || !username || !password || (isRegister && !confirmPassword);
+  const submitDisabled = submitting || !username || !password || (isRegister && !confirmPassword);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background text-foreground">
+    <div className="flex h-screen overflow-hidden bg-background text-foreground" style={dragRegionStyle}>
       <div className="hidden flex-1 items-center justify-center bg-[radial-gradient(circle_at_30%_20%,rgba(19,203,185,0.18),transparent_36%),linear-gradient(135deg,#07111f,#0b1f33_46%,#061a18)] p-10 lg:flex">
         <div className="max-w-md">
           <CodePilotLogo className="mb-8 h-24 w-24 shadow-2xl" />
@@ -153,7 +221,7 @@ export function DelaokeLoginGate({ children }: { children: React.ReactNode }) {
       </div>
 
       <div className="flex min-w-0 flex-1 items-center justify-center px-6 py-10">
-        <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-5">
+        <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-5" style={noDragRegionStyle}>
           <div className="space-y-2">
             <CodePilotLogo className="h-14 w-14 lg:hidden" />
             <h2 className="text-2xl font-semibold tracking-normal">
@@ -176,12 +244,6 @@ export function DelaokeLoginGate({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="space-y-3">
-            <Input
-              value={baseUrl}
-              onChange={(event) => setBaseUrl(event.target.value)}
-              placeholder={DEFAULT_BASE_URL}
-              autoComplete="url"
-            />
             <Input
               value={username}
               onChange={(event) => setUsername(event.target.value)}
@@ -236,7 +298,7 @@ export function DelaokeLoginGate({ children }: { children: React.ReactNode }) {
 
           <Button className="w-full" type="submit" disabled={submitDisabled}>
             {submitting && <SpinnerGap size={16} className="animate-spin" />}
-            {isRegister ? "注册并进入" : "登录并进入"}
+            {isRegister ? "注册并查看模型" : "登录并查看模型"}
           </Button>
         </form>
       </div>
